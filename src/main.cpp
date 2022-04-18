@@ -43,7 +43,7 @@ int main(int argc, char* args[])
     }
 
     Fluid f;
-    f.Load("C:\\dev\\npy_reading\\frame51to110", "fluid_", 0, 110);
+    f.Load("frame51to110", "fluid_", 0, 110);
 
     bool running = true;
     int currentFrame = 0;
