@@ -9,7 +9,7 @@ void Fluid::Load(const std::string& folder, const std::string& prefix, int start
     {
         std::stringstream fName;
         fName << std::setw(4) << std::setfill('0') << start + i;
-        std::string fileName = folder + std::string("\\") + prefix + fName.str() + std::string(".npz");
+        std::string fileName = folder + std::string("/") + prefix + fName.str() + std::string(".npz");
         m_fileData.push_back(
             cnpy::npz_load(
                 fileName
