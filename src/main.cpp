@@ -7,6 +7,28 @@
 #include "renderer/window.h"
 #include "utils/logger.h"
 
+struct CommandLineArgs 
+{
+    std::string npzPath;
+    int frameCount;
+    int firstFrame;
+};
+
+CommandLineArgs parseCommandArgs(int argc, char* args[])
+{
+    CommandLineArgs output = { "", 0, 0 };
+
+    if (argc > 1) output.npzPath = args[1];
+    if (argc > 2) output.frameCount = std::stoi(args[2]);
+    if (argc > 3) output.firstFrame = std::stoi(args[3]);
+
+    return output;
+}
+
+void printUsage()
+{
+    std::cout << "Usage: $ npz-rendering npz_path frame_count [first_frame]\n";
+}
 
 int main(int argc, char* args[])
 {
@@ -22,8 +44,24 @@ int main(int argc, char* args[])
     // std::cout << "Number of particles: " << numParticles << std::endl;
     // std::cout << (pos.num_bytes() / 4) / 3 << "size: " << pos.shape[0] << std::endl;
     
+    auto cmdLineArgs = parseCommandArgs(argc, args);
+    if (cmdLineArgs.npzPath.empty())
+    {
+        std::cerr << "Error: Missing npz folder.\n";
+        printUsage();
+        return 1;
+    }
+    if (cmdLineArgs.frameCount == 0)
+    {
+        std::cout << "Error: frame count missing or 0.\n";
+        printUsage();
+        return 0;
+    }
+
+
     const unsigned int WINDOW_WIDTH = 1366;
     const unsigned int WINDOW_HEIGHT = 768;
+
     Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false);
     fluidity::FluidRenderer* renderer;
 
@@ -43,7 +81,7 @@ int main(int argc, char* args[])
     }
 
     Fluid f;
-    f.Load("frame51to110", "fluid_", 51, 59);
+    f.Load(cmdLineArgs.npzPath, "fluid_", cmdLineArgs.firstFrame, cmdLineArgs.frameCount);
 
     bool running = true;
     int currentFrame = 0;
@@ -71,8 +109,6 @@ int main(int argc, char* args[])
         renderer->SetClearColor(.3f, .3f, .5f, 1.f);
         renderer->Clear();
 
-        // // ps.Update();
-
         renderer->SetNumberOfParticles(f.GetNumberOfParticles(currentFrame));
         renderer->SetVAO(f.GetFrameVao(currentFrame));
         renderer->Render();
@@ -81,13 +117,6 @@ int main(int argc, char* args[])
 
         window.Swap();
     }
-
- 
-
-    // for (int i = 0; i < f.GetNumberOfParticles(); i++)
-    // {
-    //     printf("(%f, %f, %f)\n", f.GetFramePosData(0)[i].x, f.GetFramePosData(0)[i].y, f.GetFramePosData(0)[i].z);
-    // }
 
     return 0;
 }

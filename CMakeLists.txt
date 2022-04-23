@@ -22,4 +22,15 @@ file(GLOB SOURCES ./src/*.cpp ./src/renderer/*.cpp)
 
 add_executable(npz-rendering ${SOURCES})
 target_include_directories(npz-rendering PUBLIC ./src)
-target_link_libraries(npz-rendering PUBLIC GLEW::GLEW ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES} cnpy)
+
+# Assets
+add_custom_target(copy-assets COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/shaders ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
+add_dependencies(npz-rendering copy-assets)
+
+if (WIN32)
+    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW SDL2::SDL2 SDL2::SDL2main cnpy)
+elseif (LINUX)
+    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES} cnpy)
+else()
+    message(FATAL_ERROR "Only Windows and Linux are supported at the moment.")
+endif ()
