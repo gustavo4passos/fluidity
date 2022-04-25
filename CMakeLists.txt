@@ -29,7 +29,7 @@ add_dependencies(npz-rendering copy-assets)
 
 if (WIN32)
     target_link_libraries(npz-rendering PUBLIC GLEW::GLEW SDL2::SDL2 SDL2::SDL2main cnpy)
-elseif (LINUX)
+elseif (UNIX)
     target_link_libraries(npz-rendering PUBLIC GLEW::GLEW ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES} cnpy)
 else()
     message(FATAL_ERROR "Only Windows and Linux are supported at the moment.")
