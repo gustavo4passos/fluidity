@@ -51,6 +51,9 @@ namespace fluidity
 
         m_surfacesShader->Bind();
         m_surfacesShader->SetUniform1f("pointRadius", m_pointRadius);
+        m_surfacesShader->SetUniform1i("bufferWidth", m_bufferWidth);
+        m_surfacesShader->SetUniform1i("bufferHeight", m_bufferHeight);
+
         m_surfacesShader->Unbind();
 
         return true;
@@ -114,6 +117,18 @@ namespace fluidity
         m_surfacesShader->SetUniformMat4("projection", glm::value_ptr(projectionMatrix));
         m_surfacesShader->SetUniformMat4("view", glm::value_ptr(view));
         m_surfacesShader->Unbind();
+    }
 
+    auto FluidSurfaceRenderers::SetUniformBuffer(const std::string& name, 
+        GLuint uniformBlockBinding) -> bool
+    {
+      GLuint index = glGetUniformBlockIndex(m_surfacesShader->programID(), name.c_str());
+      if (index == GL_INVALID_INDEX) return false;
+
+      GLCall(glUniformBlockBinding(m_surfacesShader->programID(), index, 
+            uniformBlockBinding));
+      
+      return true;
     }
 }
+

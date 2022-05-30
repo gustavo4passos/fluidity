@@ -30,34 +30,29 @@ void printUsage()
     std::cout << "Usage: $ npz-rendering npz_path frame_count [first_frame]\n";
 }
 
-int main(int argc, char* args[])
+int validateCommandLineArguments(const CommandLineArgs& cmdArgs)
 {
-    // cnpy::npz_t arr = cnpy::npz_load("C:\\dev\\npy_reading\\frame51to110\\fluid_0051.npz");
-
-    // auto& pos = arr["pos"];
-    // auto& vel = arr["vel"];
-
-    // vec3* pos_data = pos.data<vec3>();
-    // vec3* vel_data = vel.data<vec3>();
-    
-    // int numParticles = GetNumOfParticles(pos.num_bytes());
-    // std::cout << "Number of particles: " << numParticles << std::endl;
-    // std::cout << (pos.num_bytes() / 4) / 3 << "size: " << pos.shape[0] << std::endl;
-    
-    auto cmdLineArgs = parseCommandArgs(argc, args);
-    if (cmdLineArgs.npzPath.empty())
+    if (cmdArgs.npzPath.empty())
     {
         std::cerr << "Error: Missing npz folder.\n";
         printUsage();
         return 1;
     }
-    if (cmdLineArgs.frameCount == 0)
+    if (cmdArgs.frameCount == 0)
     {
         std::cout << "Error: frame count missing or 0.\n";
         printUsage();
-        return 0;
+        return 2;
     }
 
+    return 0;
+}
+
+int main(int argc, char* args[])
+{
+    auto cmdLineArgs = parseCommandArgs(argc, args);
+    auto validationStatus = validateCommandLineArguments(cmdLineArgs);
+    if (validationStatus != 0) return validationStatus;
 
     const unsigned int WINDOW_WIDTH = 1366;
     const unsigned int WINDOW_HEIGHT = 768;
@@ -72,7 +67,7 @@ int main(int argc, char* args[])
     }
     else LOG_WARNING("Window successfully created.");
 
-    renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 6.f);
+    renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0.06250);
 
     if(!renderer->Init())
     {
@@ -84,11 +79,14 @@ int main(int argc, char* args[])
     f.Load(cmdLineArgs.npzPath, "fluid_", cmdLineArgs.firstFrame, cmdLineArgs.frameCount);
 
     bool running = true;
+    bool playing = true;
     int currentFrame = 0;
 
     while(running) 
     {
         SDL_Event e;
+        vec3 movement = { 0.f, 0.f, 0.f };
+
         while(SDL_PollEvent(&e)) 
         {
             if(e.type == SDL_QUIT) running = false;
@@ -100,12 +98,28 @@ int main(int argc, char* args[])
                     {
                         running = false;
                     } break;
-                   
+
+                    case SDLK_f: 
+                    {
+                        renderer->SetFiltering(!renderer->GetFiltering());
+                    } break;
+
+                    case SDLK_SPACE:
+                    {
+                        playing = !playing;
+                    } break;
+
+                    // Camera movement
+                    case SDLK_UP:
+                    {
+                      currentCameraPosition.z = 1;
+                    }
                     default: break;
                 }
             }
         }
 
+        renderer->SetCameraPosition(currentCameraPosition);
         renderer->SetClearColor(.3f, .3f, .5f, 1.f);
         renderer->Clear();
 
@@ -113,7 +127,7 @@ int main(int argc, char* args[])
         renderer->SetVAO(f.GetFrameVao(currentFrame));
         renderer->Render();
 
-        currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();
+        if (playing) currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();
 
         window.Swap();
     }

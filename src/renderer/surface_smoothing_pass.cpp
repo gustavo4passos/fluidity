@@ -2,16 +2,19 @@
 #include "../utils/logger.h"
 #include "../utils/glcall.h"
 #include <assert.h>
+#include <glm/gtc/type_ptr.hpp>
 
 namespace fluidity
 {
     SurfaceSmoothingPass::SurfaceSmoothingPass(
         const unsigned bufferWidth,
         const unsigned bufferHeight,
+        const float    pointRadius,
         const unsigned kernelRadius,
         const unsigned nIterations)
     :   m_bufferWidth(bufferWidth),
         m_bufferHeight(bufferHeight),
+        m_pointRadius(pointRadius),
         m_kernelRadius(kernelRadius),
         m_nIterations(nIterations),
         m_fbo(0),
@@ -117,7 +120,13 @@ namespace fluidity
 
         m_bilateralFilter = new Shader(
             "../../shaders/texture_rendering.vert",
-            "../../shaders/bilateral_filter.frag");
+            "../../shaders/narrow_range_filter.frag");
+        
+        m_bilateralFilter->Bind();
+        m_bilateralFilter->SetUniform1i("bufferWidth", m_bufferWidth);
+        m_bilateralFilter->SetUniform1i("bufferHeight", m_bufferHeight);
+        m_bilateralFilter->SetUniform1f("pointRadius",  m_pointRadius);
+        m_bilateralFilter->Unbind();
 
         return true;
     }
@@ -133,7 +142,7 @@ namespace fluidity
 
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, m_fbo));
         m_bilateralFilter->Bind();
-        m_bilateralFilter->SetInt("kernelRadius", m_kernelRadius);
+        // m_bilateralFilter->SetUniform1i("kernelRadius", m_kernelRadius);
 
         GLCall(glBindVertexArray(m_screenQuadVao));
         GLCall(glActiveTexture(GL_TEXTURE0));
@@ -181,4 +190,15 @@ namespace fluidity
         m_currentWorkingSurfaces = m_smoothedSurfaces;
         m_smoothedSurfaces = tempTex;
     }
+
+    auto SurfaceSmoothingPass::SetTransformationMatrices(
+        const glm::mat4 &projectionMatrix,
+        const glm::mat4 &view) -> void
+    {
+        m_bilateralFilter->Bind();
+        // m_bilateralFilter->SetUniformMat4("projection", glm::value_ptr(projectionMatrix));
+        // m_bilateralFilter->SetUniformMat4("view", glm::value_ptr(view));
+        m_bilateralFilter->Unbind();
+    }
 };
+    

@@ -59,5 +59,9 @@
         "xutility": "cpp",
         "fstream": "cpp",
         "set": "cpp"
-    }
+    },
+    "cmake.debugConfig": {
+        "args": ["C:\\dev\\npy_reading\\frame51to110", "110"]
+    },
+    "cmake.configureOnOpen": false
 }

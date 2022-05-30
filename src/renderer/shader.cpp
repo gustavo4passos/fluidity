@@ -52,9 +52,14 @@ void Shader::SetUniform3fv(const char* name, GLfloat* v0)
   GLCall(glUniform3fv(GetUniformLocation(name), 1, v0));
 }
 
-void Shader::SetInt(const char* name, GLint v0)
+void Shader::SetUniform1i(const char* name, GLint v0)
 {
   GLCall(glUniform1i(GetUniformLocation(name), v0));
+}
+
+void Shader::SetUniform1ui(const char* name, GLuint v0)
+{
+  GLCall(glUniform1ui(GetUniformLocation(name), v0));
 }
 
 void Shader::PrintActiveAttributes() const {
@@ -178,7 +183,7 @@ GLint Shader::GetUniformLocation(const std::string& name) {
   GLint location = glGetUniformLocation(this->_programID, name.c_str());
 
   // If uniform isn't found in program
-  if(location == -1) LOG_ERROR("Unable to find uniform: " + name);
+  if(location == -1) LOG_ERROR("in shader " + _vertexShaderFilepath + " Unable to find uniform: " + name);
 
   return location;
 }

@@ -23,6 +23,7 @@ public:
     auto SetVAO(GLuint vao) -> void;
     auto SetNumberOfParticles(unsigned n) -> void;
     auto SetTransformationMatrices(const glm::mat4 &projectionMatrix, const glm::mat4 &view) -> void;
+    auto SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding) -> bool;
 
 private:
     Shader *m_surfacesShader;

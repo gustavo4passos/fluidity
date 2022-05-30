@@ -1,6 +1,7 @@
 #include "fluid_renderer.h"
 #include "../utils/glcall.h"
 #include "../utils/logger.h"
+#include "../Vec.hpp"
 #include <SDL2/SDL.h>
 #include <cmath>
 #include <glm/glm.hpp>
@@ -13,13 +14,20 @@ namespace fluidity
     :   Renderer(),
         m_fluidSurfaces(nullptr),
         m_textureRenderer(nullptr),
+        m_particleRenderPass(nullptr),
         m_currentVAO(0),
+        m_uniformBufferCameraData(0),
+        m_uniformBufferLights(0),
+        m_uniformBufferMaterial(0),
         m_currentNumberOfParticles(0),
         m_windowWidth(windowWidth),
         m_windowHeight(windowHeight),
         m_aspectRatio((float) windowWidth / windowHeight),
-        m_pointRadius(pointRadius)
-    { }
+        m_pointRadius(pointRadius),
+        m_filteringEnabled(true)
+    { 
+        m_cameraPosition = {20.f, 10.f, 5};
+    }
 
     auto FluidRenderer::Clear() -> void
     {
@@ -31,10 +39,18 @@ namespace fluidity
         glClearColor(r, g, b, a);
     }
 
+    auto FluidRenderer::SetCameraPosition(const vec3& position) -> void 
+    {
+      m_cameraPosition.x = position.x;
+      m_cameraPosition.y = position.y;
+      m_cameraPosition.z = position.z;
+    }
+
     auto FluidRenderer::SetVAO(GLuint vao) -> void
     {
         m_currentVAO = vao;
         m_fluidSurfaces->SetVAO(vao);
+        m_particleRenderPass->SetParticlesVAO(vao);
     }
 
     auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
@@ -42,6 +58,12 @@ namespace fluidity
         m_currentNumberOfParticles = n;
 
         m_fluidSurfaces->SetNumberOfParticles(n);
+        m_particleRenderPass->SetNumberOfParticles(n);
+    }
+
+    auto FluidRenderer::SetFiltering(bool enabled) -> void
+    {
+        m_filteringEnabled = enabled;
     }
 
     auto FluidRenderer::Init() -> bool 
@@ -60,11 +82,26 @@ namespace fluidity
             4U,
             5U);
 
+        m_particleRenderPass = new ParticleRenderPass(
+            m_windowWidth,
+            m_windowHeight,
+            m_currentNumberOfParticles,
+            m_pointRadius,
+            m_currentVAO
+        );
+
+        if  (!m_particleRenderPass->Init())
+        {
+            LOG_ERROR("Unable to initialize particle render pass.");
+            return false;
+        }
+
         if(!m_fluidSurfaces->Init())
         {
             LOG_ERROR("Unable to initialize fluid surfaces generation pass.");
             return false;
         } 
+        
         if(!m_textureRenderer->Init()) 
         {
             LOG_ERROR("Unable to initialize texture renderer.");
@@ -76,9 +113,101 @@ namespace fluidity
             return false;
         }
 
+        if (!InitUniformBuffers()) return false;
+
+        SetUpLights();
+        SetUpMaterial();
+
         return true;
     }
 
+    auto FluidRenderer::InitUniformBuffers() -> bool
+    {
+        GLCall(glGenBuffers(1, &m_uniformBufferCameraData));
+        GLCall(glGenBuffers(1, &m_uniformBufferLights));
+        GLCall(glGenBuffers(1, &m_uniformBufferMaterial));
+
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
+        GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraData), nullptr, GL_DYNAMIC_DRAW));
+        GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 0, m_uniformBufferCameraData, 0, sizeof(CameraData)));
+
+        // Size of Lights is the total number of lights + an int that stores the number of lights in the scene
+        constexpr int LIGHTS_UB_SIZE = sizeof(PointLight) * NUM_TOTAL_LIGHTS + sizeof(int);
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
+        GLCall(glBufferData(GL_UNIFORM_BUFFER, LIGHTS_UB_SIZE, nullptr, GL_STATIC_DRAW));
+        GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 1, m_uniformBufferLights, 0, LIGHTS_UB_SIZE));
+
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
+        GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(Material), nullptr, GL_STATIC_DRAW));
+        GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 2, m_uniformBufferMaterial, 0, sizeof(Material)));
+
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+
+        if (!m_fluidSurfaces->SetUniformBuffer("CameraData", 0))
+        {
+          LOG_ERROR("Unable to set CameraData uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+        if (!m_fluidSurfaces->SetUniformBuffer("Lights", 1))
+        {
+          LOG_ERROR("Unable to set Lights uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+        if (!m_fluidSurfaces->SetUniformBuffer("Material", 2))
+        {
+          LOG_ERROR("Unable to set Material uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+
+        if (!m_particleRenderPass->SetUniformBuffer("CameraData", 0))
+        {
+          LOG_ERROR("Unable to set CameraData uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+        if (!m_particleRenderPass->SetUniformBuffer("Lights", 1))
+        {
+          LOG_ERROR("Unable to set Lights uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+        if (!m_particleRenderPass->SetUniformBuffer("Material", 2))
+        {
+          LOG_ERROR("Unable to set Material uniform buffer on FluidSurfaces renderer");
+          return false;
+        }
+
+        return true;
+    }
+
+    auto FluidRenderer::SetUpLights() -> void
+    {
+      PointLight light;
+      light.ambient  = { 1.f, 1.f, 1.f, 1.f };
+      light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
+      light.specular = { 1.f, 1.f, 1.f, 1.f };
+
+      light.position = { 0, 100.f, 0, 1.f };
+
+      int numLights = 1;
+      constexpr int numLightsFieldOffset = sizeof(PointLight) * NUM_TOTAL_LIGHTS;
+      glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights);
+      glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(PointLight), &light);
+      glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights);
+      glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+
+    auto FluidRenderer::SetUpMaterial() -> void
+    {
+      Material material;
+      material.ambient   = { 1.f, 1.f, 1.f, 1.f };
+      material.diffuse   = { 1.f, 1.f, 1.f, 1.f };
+      material.specular  = { 1.f, 1.f, 1.f, 1.f };
+      material.shininess = 1;
+
+      glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial);
+      glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material);
+      glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
+ 
     auto FluidRenderer::Render() -> void
     {
         // m_fluidShader.Bind();
@@ -86,6 +215,7 @@ namespace fluidity
         //     "projection", 
         //     glm::value_ptr(projectionMatrix));
         // m_fluidShader.SetUniform1f("pointRadius", m_pointRadius);
+
 
         glm::mat4 projectionMatrix = glm::perspective(
             glm::radians(45.f), 
@@ -98,8 +228,10 @@ namespace fluidity
         float camZ = std::cos(SDL_GetTicks() * 0.5 * radius);
 
         // glm::vec3 cameraPos = glm::vec3(1 + 3 * camX, 0.f, 1 + -1.f * camZ);
-        glm::vec3 cameraPos = glm::vec3(1, 0.f, 30);
-        glm::vec3 cameraTarget = glm::vec3(0.f, -0.5f, 0.f);
+        glm::vec3 cameraPos = glm::vec3(m_cameraPosition.x, 
+            m_cameraPosition.y,
+            m_cameraPosition.z);
+        glm::vec3 cameraTarget = glm::vec3(0.f, -1.f, 0.f);
         glm::vec3 up = glm::vec3(0.f, 1.f, 0.f);
         glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, up);
 
@@ -113,22 +245,72 @@ namespace fluidity
         */
 
         // m_fluidShader.Unbind();
+        //
+        // Upload cameraData uniform buffer
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
+
+        GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view)));
+        GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), 
+              glm::value_ptr(projectionMatrix)));
+        GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2,  sizeof(glm::mat4), 
+              glm::value_ptr(glm::inverse(view))));
+        GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 3,  sizeof(glm::mat4), 
+              glm::value_ptr(glm::inverse(projectionMatrix))));
+        GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+ 
+
+#if UNIFORM_MATRICES_ENABLED
+        GLCall(glEnable(GL_DEPTH_TEST));
+        Clear();
+        m_particleRenderPass->SetTransformationMatrices(
+            projectionMatrix,
+            view
+        );
 
         m_fluidSurfaces->SetTransformationMatrices(
             projectionMatrix, 
             view);
 
+        m_surfaceSmoothingPass->SetTransformationMatrices(
+            projectionMatrix,
+            view
+        );
+#endif
+
+
+#if FILTERING_ENABLED
         m_fluidSurfaces->Render();
 
         m_surfaceSmoothingPass->SetUnfilteredSurfaces(
             m_fluidSurfaces->GetFrontSurface());
         m_surfaceSmoothingPass->Render();
-        
+
+
         m_textureRenderer->SetTexture(
-            m_surfaceSmoothingPass->GetSmoothedSurfaces());
+            m_filteringEnabled ? 
+            m_surfaceSmoothingPass->GetSmoothedSurfaces() :
+            m_fluidSurfaces->GetFrontSurface());
+        
+
+        m_textureRenderer->SetTexture(
+            m_fluidSurfaces->GetFrontSurface());
+#endif
+
+        // for (int i = 0; i < 4; i++)
+        // {
+        //     m_surfaceSmoothingPass->SetUnfilteredSurfaces(
+        //         m_surfaceSmoothingPass->GetSmoothedSurfaces());
+        //     m_surfaceSmoothingPass->Render();
+        // }
+
+        m_particleRenderPass->Render();
+        m_textureRenderer->SetTexture(
+            m_particleRenderPass->GetBuffer()
+        );
 
         GLCall(glEnable(GL_DEPTH_TEST));
         Clear();
+
         m_textureRenderer->Render();
     }
 }
