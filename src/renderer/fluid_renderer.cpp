@@ -178,16 +178,26 @@ namespace fluidity
     auto FluidRenderer::SetUpLights() -> void
     {
       PointLight light;
-      light.ambient  = { 1.f, 1.f, 1.f, 1.f };
+      light.ambient  = { .2f, .2f, .2f, .2f };
       light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
       light.specular = { 1.f, 1.f, 1.f, 1.f };
 
-      light.position = { -10, 20.f, 10.f, 1.f };
+      light.position = { -1, 20.f, 10.f, 1.f };
+
+      PointLight light2;
+      light2.ambient  = { .5f, .5f, .5f, 1.f };
+      light2.diffuse  = { 1.f, 1.f, 1.f, 1.f };
+      light2.specular = { 1.f, 1.f, 1.f, 1.f };
+      light.position = { 10, -20.f, -10.f, 1.f };
 
       int numLights = 1;
       constexpr int numLightsFieldOffset = sizeof(PointLight) * NUM_TOTAL_LIGHTS;
+
       glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights);
+      // Upload light 1
       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(PointLight), &light);
+      glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight), sizeof(PointLight), &light);
+
       glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
@@ -197,8 +207,8 @@ namespace fluidity
       Material material;
       material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
       material.diffuse   = { 0.f, 1.f, 0.f, 1.f };
-      material.specular  = { 0.f, 0.f, 0.f, 1.f };
-      material.shininess = 12;
+      material.specular  = { 1.f, 1.f, 1.f, 1.f };
+      material.shininess = 250;
 
       glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial);
       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material);
