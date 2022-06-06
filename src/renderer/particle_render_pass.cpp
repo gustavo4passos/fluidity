@@ -111,7 +111,7 @@ ParticleRenderPass::ParticleRenderPass(
     {
       m_particleRendererShader->Bind();
       m_particleRendererShader->SetUniform1ui("u_nParticles", m_numberOfParticles);
-      m_particleRendererShader->SetUniform1i("u_ColorMode", COLOR_MODE_RANDOM);
+      m_particleRendererShader->SetUniform1i("u_ColorMode", COLOR_MODE_UNIFORM_MATERIAL);
       m_particleRendererShader->SetUniform1i("u_UseAnisotropyKernel", 0);
       m_particleRendererShader->SetUniform1f("u_PointRadius", (float)m_pointRadius);
       m_particleRendererShader->SetUniform1i("u_ScreenWidth", m_bufferWidth);

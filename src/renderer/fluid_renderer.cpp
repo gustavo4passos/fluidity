@@ -24,10 +24,9 @@ namespace fluidity
         m_windowHeight(windowHeight),
         m_aspectRatio((float) windowWidth / windowHeight),
         m_pointRadius(pointRadius),
-        m_filteringEnabled(true)
-    { 
-        m_cameraPosition = {20.f, 10.f, 5};
-    }
+        m_filteringEnabled(true),
+        m_cameraController(Camera({ 20.f, 10.f, 5}, 45.f))
+    { /* */ }
 
     auto FluidRenderer::Clear() -> void
     {
@@ -37,13 +36,6 @@ namespace fluidity
     auto FluidRenderer::SetClearColor(float r, float g, float b, float a) -> void
     {
         glClearColor(r, g, b, a);
-    }
-
-    auto FluidRenderer::SetCameraPosition(const vec3& position) -> void 
-    {
-      m_cameraPosition.x = position.x;
-      m_cameraPosition.y = position.y;
-      m_cameraPosition.z = position.z;
     }
 
     auto FluidRenderer::SetVAO(GLuint vao) -> void
@@ -74,7 +66,7 @@ namespace fluidity
             m_windowWidth, 
             m_windowHeight, 
             m_pointRadius,
-            FAR_PLANE);
+            Camera::FAR_PLANE);
         m_textureRenderer = new TextureRenderer();
         m_surfaceSmoothingPass = new SurfaceSmoothingPass(
             m_windowWidth,
@@ -119,6 +111,11 @@ namespace fluidity
         SetUpMaterial();
 
         return true;
+    }
+
+    auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
+    {
+      m_cameraController.ProcessInput(e);
     }
 
     auto FluidRenderer::InitUniformBuffers() -> bool
@@ -181,7 +178,7 @@ namespace fluidity
     auto FluidRenderer::SetUpLights() -> void
     {
       PointLight light;
-      light.ambient  = { 1.f, 1.f, 1.f, 1.f };
+      light.ambient  = { 0.2f, 0.2f, 0.2f, 1.f };
       light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
       light.specular = { 1.f, 1.f, 1.f, 1.f };
 
@@ -198,45 +195,23 @@ namespace fluidity
     auto FluidRenderer::SetUpMaterial() -> void
     {
       Material material;
-      material.ambient   = { 1.f, 1.f, 1.f, 1.f };
-      material.diffuse   = { 1.f, 1.f, 1.f, 1.f };
-      material.specular  = { 1.f, 1.f, 1.f, 1.f };
-      material.shininess = 1;
+      material.ambient   = { 0.2f, 0.2f, 0.2f, 1.f };
+      material.diffuse   = { 0.f, 1.f, 0.f, 1.f };
+      material.specular  = { 0.f, 0.f, 0.f, 1.f };
+      material.shininess = 12;
 
       glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial);
       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
+
+    auto FluidRenderer::Update() -> void
+    {
+      m_cameraController.Update();
+    }
  
     auto FluidRenderer::Render() -> void
     {
-        // m_fluidShader.Bind();
-        // m_fluidShader.SetUniformMat4(
-        //     "projection", 
-        //     glm::value_ptr(projectionMatrix));
-        // m_fluidShader.SetUniform1f("pointRadius", m_pointRadius);
-
-
-        glm::mat4 projectionMatrix = glm::perspective(
-            glm::radians(45.f), 
-            m_aspectRatio, 
-            NEAR_PLANE, 
-            FAR_PLANE);
-
-        float radius = 0.001;
-        float camX = std::sin(SDL_GetTicks() * 0.5 * radius);
-        float camZ = std::cos(SDL_GetTicks() * 0.5 * radius);
-
-        // glm::vec3 cameraPos = glm::vec3(1 + 3 * camX, 0.f, 1 + -1.f * camZ);
-        glm::vec3 cameraPos = glm::vec3(m_cameraPosition.x, 
-            m_cameraPosition.y,
-            m_cameraPosition.z);
-        glm::vec3 cameraTarget = glm::vec3(0.f, -1.f, 0.f);
-        glm::vec3 up = glm::vec3(0.f, 1.f, 0.f);
-        glm::mat4 view = glm::lookAt(cameraPos, cameraTarget, up);
-
-        // m_fluidShader.SetUniformMat4("view", glm::value_ptr(view));
-
         /*
         GLCall(glBindVertexArray(m_currentVAO));
         GLCall(glEnable(GL_DEPTH_TEST));
@@ -244,18 +219,19 @@ namespace fluidity
         GLCall(glBindVertexArray(0));
         */
 
-        // m_fluidShader.Unbind();
-        //
         // Upload cameraData uniform buffer
         GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
 
+        auto view = m_cameraController.GetCamera().GetViewMatrix();
+        auto projection = m_cameraController.GetCamera().GetProjectionMatrix();
+
         GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view)));
         GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), 
-              glm::value_ptr(projectionMatrix)));
+              glm::value_ptr(projection)));
         GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2,  sizeof(glm::mat4), 
               glm::value_ptr(glm::inverse(view))));
         GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 3,  sizeof(glm::mat4), 
-              glm::value_ptr(glm::inverse(projectionMatrix))));
+              glm::value_ptr(glm::inverse(projection))));
         GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
  
 

@@ -36,5 +36,4 @@ void main()
     float fragDepth = (projectionMatrix  * vec4(fragPos, 1.0)).z;
 
     frontSurface = vec4(fragDepth, -fragDepth, 0.0, 1.0);
-    frontSurface = vec4(1.0);
 }

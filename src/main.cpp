@@ -85,10 +85,10 @@ int main(int argc, char* args[])
     while(running) 
     {
         SDL_Event e;
-        vec3 movement = { 0.f, 0.f, 0.f };
 
         while(SDL_PollEvent(&e)) 
         {
+
             if(e.type == SDL_QUIT) running = false;
             if(e.type == SDL_KEYUP)
             {
@@ -109,22 +109,18 @@ int main(int argc, char* args[])
                         playing = !playing;
                     } break;
 
-                    // Camera movement
-                    case SDLK_UP:
-                    {
-                      currentCameraPosition.z = 1;
-                    }
                     default: break;
                 }
             }
+            renderer->ProcessInput(e);
         }
 
-        renderer->SetCameraPosition(currentCameraPosition);
         renderer->SetClearColor(.3f, .3f, .5f, 1.f);
         renderer->Clear();
 
         renderer->SetNumberOfParticles(f.GetNumberOfParticles(currentFrame));
         renderer->SetVAO(f.GetFrameVao(currentFrame));
+        renderer->Update();
         renderer->Render();
 
         if (playing) currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();

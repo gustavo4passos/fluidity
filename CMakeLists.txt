@@ -18,7 +18,7 @@ find_package(glm CONFIG REQUIRED)
 #find_package(yaml-cpp CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
-file(GLOB SOURCES ./src/*.cpp ./src/renderer/*.cpp)
+file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp)
 
 add_executable(npz-rendering ${SOURCES})
 target_include_directories(npz-rendering PUBLIC ./src)

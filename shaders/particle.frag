@@ -144,9 +144,5 @@ void main()
     }
 
     outColor = vec4(shadeColor, 1.0);
-    outColor.g = 1.0;
-    outColor.g *= (u_ScreenHeight - 767);
-    outColor = vec4(fragPos, 1.0);
-    outColor = vec4(f_ViewCenter, 1.0);
 }
 

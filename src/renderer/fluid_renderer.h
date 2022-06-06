@@ -6,8 +6,8 @@
 #include "surface_smoothing_pass.h"
 #include "particle_render_pass.hpp"
 #include "texture_renderer.h"
-#include "../Vec.hpp"
 #include "../utils/export_directives.h"
+#include "../utils/camera_controller.hpp"
 
 namespace fluidity
 {
@@ -22,14 +22,14 @@ public:
     auto Clear() -> void;
     auto SetVAO(GLuint vao) -> void;
     auto SetNumberOfParticles(unsigned n) -> void;
+    auto Update() -> void override;
     auto Render() -> void override;
     auto SetClearColor(float r, float g, float b, float a) -> void;
 
     auto SetFiltering(bool enabled) -> void;
     auto GetFiltering() -> bool { return m_filteringEnabled; }
 
-    auto GetCameraPosition() -> vec3 { return m_cameraPosition; }
-    auto SetCameraPosition(const vec3& position) -> void;
+    auto ProcessInput(const SDL_Event& event) -> void;
 
 private:
     auto InitUniformBuffers() -> bool;
@@ -58,10 +58,6 @@ private:
 
     bool m_filteringEnabled;
 
-    vec3 m_cameraPosition;
-
-    const GLfloat NEAR_PLANE = 0.1f;
-    const GLfloat FAR_PLANE  = 100.f;
+    CameraController m_cameraController;
 };
-
 }
