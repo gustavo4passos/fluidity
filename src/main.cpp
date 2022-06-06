@@ -82,6 +82,7 @@ int main(int argc, char* args[])
     bool playing = true;
     int currentFrame = 0;
 
+    SDL_CaptureMouse(SDL_TRUE);
     while(running) 
     {
         SDL_Event e;

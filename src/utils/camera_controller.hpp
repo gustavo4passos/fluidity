@@ -14,8 +14,13 @@ namespace fluidity
     void Update();
 
   private:
+    void ProcessMouse();
     Camera m_camera;
     float m_speed;
+
+    glm::vec2 m_lastMousePosition;
+    float m_yaw;
+    float m_pitch;
 
     glm::vec3 m_movingOnAxis;
   };
