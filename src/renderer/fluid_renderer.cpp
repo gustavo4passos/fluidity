@@ -25,7 +25,7 @@ namespace fluidity
         m_aspectRatio((float) windowWidth / windowHeight),
         m_pointRadius(pointRadius),
         m_filteringEnabled(true),
-        m_cameraController(Camera({ 20.f, 10.f, 5}, 45.f))
+        m_cameraController(Camera({ 9.66f, 7.73f, 5}, 45.f))
     { /* */ }
 
     auto FluidRenderer::Clear() -> void
