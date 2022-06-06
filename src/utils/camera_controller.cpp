@@ -131,8 +131,5 @@ namespace fluidity
     cameraPos += m_movingOnAxis.z * m_speed * m_camera.GetFront();
     cameraPos += m_movingOnAxis.y * m_speed * Camera::UP;
     m_camera.SetPosition(cameraPos);
-
-    std::cout << "Pos : (" << cameraPos.x << ", " << cameraPos.y << ")\n";
-    std::cout << "Yaw: " << m_yaw << ", Pitch: " << m_pitch << "\n";
   }
 }

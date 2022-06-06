@@ -178,11 +178,11 @@ namespace fluidity
     auto FluidRenderer::SetUpLights() -> void
     {
       PointLight light;
-      light.ambient  = { 0.2f, 0.2f, 0.2f, 1.f };
+      light.ambient  = { 1.f, 1.f, 1.f, 1.f };
       light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
       light.specular = { 1.f, 1.f, 1.f, 1.f };
 
-      light.position = { 0, 100.f, 0, 1.f };
+      light.position = { -10, 20.f, 10.f, 1.f };
 
       int numLights = 1;
       constexpr int numLightsFieldOffset = sizeof(PointLight) * NUM_TOTAL_LIGHTS;
@@ -195,7 +195,7 @@ namespace fluidity
     auto FluidRenderer::SetUpMaterial() -> void
     {
       Material material;
-      material.ambient   = { 0.2f, 0.2f, 0.2f, 1.f };
+      material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
       material.diffuse   = { 0.f, 1.f, 0.f, 1.f };
       material.specular  = { 0.f, 0.f, 0.f, 1.f };
       material.shininess = 12;
