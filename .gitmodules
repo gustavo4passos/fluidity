@@ -1,3 +1,6 @@
 [submodule ".\\external\\cnpy"]
 	path = .\\external\\cnpy
 	url = https://github.com/rogersce/cnpy
+[submodule "external/assimp"]
+	path = external/assimp
+	url = https://github.com/assimp/assimp

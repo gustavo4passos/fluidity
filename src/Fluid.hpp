@@ -10,7 +10,7 @@ class Fluid {
 public:
     Fluid()
     : m_Count(0) { }
-    void Load(const std::string& folder, const std::string& prefix, int start, int count);
+    bool Load(const std::string& folder, const std::string& prefix, int start, int count);
 
     cnpy::npz_t& GetFrameData(int frame);
 
@@ -22,7 +22,7 @@ public:
 
 private:
     cnpy::NpyArray& GetFramePosArray(int frame);
-    void LoadFrameToVao(int frame);
+    bool LoadFrameToVao(int frame);
 
     int m_Count;
     std::vector<cnpy::npz_t> m_fileData;

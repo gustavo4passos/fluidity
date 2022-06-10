@@ -7,8 +7,19 @@ add_compile_definitions(DEBUG_BUILD)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY bin)
 
+# External submodule - cnpy
 add_subdirectory(./external/cnpy)
+
+# External submodule - assimp
+SET(ASSIMP_BUILD_TESTS OFF)
+SET(ASSIMP_BUILD_ASSIMP_VIEW OFF)
+SET(ASSIMP_BUILD_ASSIMP_SAMPLES OFF)
+SET(ASSIMP_INSTALL OFF)
+
+add_subdirectory(./external/assimp)
+
 include_directories(./external/cnpy/)
+include_directories(./external/assimp/include)
 
 find_package(SDL2 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -34,9 +45,9 @@ endif ()
 add_dependencies(npz-rendering copy-assets)
 
 if (WIN32)
-    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW SDL2::SDL2 SDL2::SDL2main cnpy)
+    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW SDL2::SDL2 SDL2::SDL2main cnpy assimp)
 elseif (UNIX)
-    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES} cnpy)
+    target_link_libraries(npz-rendering PUBLIC GLEW::GLEW ${SDL2_LIBRARIES} ${OPENGL_LIBRARIES} cnpy assimp)
 else()
     message(FATAL_ERROR "Only Windows and Linux are supported at the moment.")
 endif ()

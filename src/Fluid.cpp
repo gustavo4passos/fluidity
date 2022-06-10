@@ -3,11 +3,12 @@
 #include <iomanip>
 #include <iostream>
 
-void Fluid::Load(const std::string& folder, const std::string& prefix, int start, int count)
+bool Fluid::Load(const std::string& folder, const std::string& prefix, int start, int count)
 {
     for (int i = 0; i < count; i++)
     {
         std::stringstream fName;
+        // TODO: Perform error checking
         fName << std::setw(4) << std::setfill('0') << start + i;
         std::string fileName = folder + std::string("/") + prefix + fName.str() + std::string(".npz");
         m_fileData.push_back(
@@ -19,7 +20,7 @@ void Fluid::Load(const std::string& folder, const std::string& prefix, int start
         LoadFrameToVao(i);
     }
 
-
+    return true;
 }
 
 cnpy::npz_t& Fluid::GetFrameData(int frame) 
@@ -35,9 +36,9 @@ GLuint Fluid::GetFrameVao(int frame)
 }
 
 
-void Fluid::LoadFrameToVao(int frame)
+bool Fluid::LoadFrameToVao(int frame)
 {
-
+    // TODO: Perform error checking
     GLuint vao, vbo;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -48,6 +49,8 @@ void Fluid::LoadFrameToVao(int frame)
     glEnableVertexAttribArray(0);
 
     m_FrameVaos.insert(m_FrameVaos.begin() + frame, vao);
+
+    return true;
 }
 
 
