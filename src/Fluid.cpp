@@ -70,3 +70,4 @@ int Fluid::GetNumberOfParticles(int frame)
     const int COMPONENT_SIZE = 4; // Bytes
     return GetFramePosArray(frame).num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
 }
+ 

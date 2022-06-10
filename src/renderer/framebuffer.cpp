@@ -12,29 +12,20 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
 
 bool Framebuffer::Init()
 {
-  
+  // TODO: Invalidate framebuffer before initializing it, in case it is called
+  // more than once (when an attachment is added after it has already been initalized,
+  // for example)
   GLCall(glGenFramebuffers(1, &m_fbo));
   GLCall(glBindFramebuffer(GL_FRAMEBUFFER, m_fbo));
 
-  int currentAttachment = 0;
   std::vector<GLenum> attachments;
 
   for (const auto& a : m_specification.attachments)
   {
-    GLuint texture;
-    GLCall(glGenTextures(1, &texture));
-    GLCall(glBindTexture(GL_TEXTURE_2D, texture));
-    GLCall(glTexImage2D(GL_TEXTURE_2D, 0, a.internalFormat, a.width, a.height, 0, 
-          a.pixelFormat, a.dataType, nullptr));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
-    GLCall(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + currentAttachment, GL_TEXTURE_2D, texture, 0));
-
-    m_attachments.push_back(texture);
+    InitAttachment(a);
+    int currentAttachment = attachments.size();
     attachments.push_back((GLenum)(GL_COLOR_ATTACHMENT0 + currentAttachment));
-    currentAttachment++;
   }
-
 
   // TODO: Clean up in case of failure
   if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -43,10 +34,49 @@ bool Framebuffer::Init()
       return false;
   }
   
+  // TODO: What if attachments is empty?
   GLCall(glDrawBuffers(attachments.size(), &attachments[0]));
   GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 
   return true;
+}
+
+void Framebuffer::PushAttachment(const FramebufferAttachment& attachment)
+{ 
+  m_specification.attachments.push_back(attachment);
+}
+
+void Framebuffer::InitAttachment(const FramebufferAttachment& attachment)
+{
+    int currentAttachmentIndex = m_attachments.size();
+    GLuint texture;
+    GLCall(glGenTextures(1, &texture));
+    GLCall(glBindTexture(GL_TEXTURE_2D, texture));
+    GLCall(glTexImage2D(GL_TEXTURE_2D, 0, attachment.internalFormat, attachment.width, 
+          attachment.height, 0, attachment.pixelFormat, attachment.dataType, nullptr));
+    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    GLCall(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + currentAttachmentIndex,
+          GL_TEXTURE_2D, texture, 0));
+
+    m_attachments.push_back(texture);
+}
+
+void Framebuffer::Bind()
+{
+  GLCall(glBindFramebuffer(GL_FRAMEBUFFER, m_fbo));
+
+  // Bind attachments
+  for (int i = 0; i < m_attachments.size(); i++)
+  {
+    glActiveTexture(GL_TEXTURE0 + i);
+    glBindTexture(GL_TEXTURE_2D, GetAttachment(i));
+  }
+}
+
+void Framebuffer::Unbind()
+{
+  GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 }
 
 GLuint Framebuffer::GetAttachment(int attachmentNumber)

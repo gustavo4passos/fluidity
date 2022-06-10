@@ -22,10 +22,16 @@ namespace fluidity
   {
   public:
     Framebuffer(const FramebufferSpecification& specification);
+    void PushAttachment(const FramebufferAttachment& attachment);
     bool Init();
+    void Bind();
+    void Unbind();
+
     GLuint GetAttachment(int attachmentNumber);
 
   private:
+    void InitAttachment(const FramebufferAttachment& attachment);
+
     FramebufferSpecification m_specification;
     GLuint m_fbo;
     std::vector<GLuint> m_attachments;

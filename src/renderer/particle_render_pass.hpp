@@ -1,4 +1,5 @@
 #pragma once
+#include "framebuffer.hpp"
 #include "renderer.h"
 #include "shader.h"
 #include <glm/glm.hpp>
@@ -19,10 +20,7 @@ public:
 
     auto Init() -> bool;
     auto Render() -> void;
-    auto GetBuffer() -> GLuint { return m_buffer; }
-    auto SetTransformationMatrices(
-        const glm::mat4& projectionMatrix, 
-        const glm::mat4& view) -> void;
+    auto GetBuffer() -> GLuint { return m_framebuffer.GetAttachment(0); }
 
     auto SetParticlesVAO(GLuint particlesVAO) -> void { m_particlesVAO = particlesVAO; }
     auto SetNumberOfParticles(unsigned nParticles) -> void { m_numberOfParticles = nParticles; }
@@ -40,6 +38,8 @@ private:
     GLuint m_particlesVAO;
     
     Shader* m_particleRendererShader; 
+
+    Framebuffer m_framebuffer;
 
     enum ColorMode 
     {
