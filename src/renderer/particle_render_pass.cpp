@@ -12,30 +12,24 @@ ParticleRenderPass::ParticleRenderPass(
     const unsigned numberOfParticles,
     const float pointRadius,
     GLuint particlesVAO)
-    : m_bufferWidth(bufferWidth),
-    m_bufferHeight(bufferHeight),
-    m_numberOfParticles(numberOfParticles),
-    m_pointRadius(pointRadius),
-    m_particlesVAO(particlesVAO),
-    m_particleRendererShader(nullptr),
-    m_framebuffer({})
+    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO)
     { /* */ }
 
-    auto ParticleRenderPass::Init() -> bool
+    bool ParticleRenderPass::Init()
     {
-        m_particleRendererShader = new Shader("../../shaders/particle.vert", "../../shaders/particle.frag");
+        m_shader = new Shader("../../shaders/particle.vert", "../../shaders/particle.frag");
         m_framebuffer.PushAttachment({ GL_RGBA32F, (int)m_bufferWidth, (int)m_bufferHeight, 
             GL_RGBA, GL_FLOAT
         });
-        m_framebuffer.Init();
+        
+        if (!RenderPass::Init()) return false;
 
-        SetUniforms();
         return true;
     }
 
-    auto ParticleRenderPass::Render() -> void
+    void ParticleRenderPass::Render()
     {
-        assert(m_particleRendererShader != nullptr);
+        assert(m_shader != nullptr);
 
         // Save OpenGL state before changing it
         GLboolean isBlendEnabled;
@@ -44,7 +38,7 @@ ParticleRenderPass::ParticleRenderPass(
         GLCall(glGetBooleanv(GL_DEPTH_TEST, &isDepthTestEnabled));
 
         m_framebuffer.Bind();
-        m_particleRendererShader->Bind();
+        m_shader->Bind();
 
         GLCall(glBindVertexArray(m_particlesVAO));
         // glBindTexture(GL_TEXTURE_2D, m_buffer);
@@ -56,7 +50,7 @@ ParticleRenderPass::ParticleRenderPass(
         GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
 
         GLCall(glBindVertexArray(0));
-        m_particleRendererShader->Unbind();
+        m_shader->Unbind();
         m_framebuffer.Unbind();
 
         if (!isBlendEnabled)
@@ -69,27 +63,17 @@ ParticleRenderPass::ParticleRenderPass(
         }
     }
 
-    auto ParticleRenderPass::SetUniforms() -> void
+    bool ParticleRenderPass::SetUniforms()
     {
-      m_particleRendererShader->Bind();
-      m_particleRendererShader->SetUniform1ui("u_nParticles", m_numberOfParticles);
-      m_particleRendererShader->SetUniform1i("u_ColorMode", COLOR_MODE_RANDOM);
-      m_particleRendererShader->SetUniform1i("u_UseAnisotropyKernel", 0);
-      m_particleRendererShader->SetUniform1f("u_PointRadius", (float)m_pointRadius);
-      m_particleRendererShader->SetUniform1i("u_ScreenWidth", m_bufferWidth);
-      m_particleRendererShader->SetUniform1i("u_ScreenHeight", m_bufferHeight);
-      m_particleRendererShader->Unbind(); 
-    }
+      m_shader->Bind();
+      m_shader->SetUniform1ui("u_nParticles", m_numberOfParticles);
+      m_shader->SetUniform1i("u_ColorMode", COLOR_MODE_RANDOM);
+      m_shader->SetUniform1i("u_UseAnisotropyKernel", 0);
+      m_shader->SetUniform1f("u_PointRadius", (float)m_pointRadius);
+      m_shader->SetUniform1i("u_ScreenWidth", m_bufferWidth);
+      m_shader->SetUniform1i("u_ScreenHeight", m_bufferHeight);
+      m_shader->Unbind(); 
 
-    auto ParticleRenderPass::SetUniformBuffer(const std::string& name, 
-        GLuint uniformBlockBinding) -> bool
-    {
-      GLuint index = glGetUniformBlockIndex(m_particleRendererShader->programID(), name.c_str());
-      if (index == GL_INVALID_INDEX) return false;
-
-      GLCall(glUniformBlockBinding(m_particleRendererShader->programID(), index, 
-            uniformBlockBinding));
-      
       return true;
     }
 }

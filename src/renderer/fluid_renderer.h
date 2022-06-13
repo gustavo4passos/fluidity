@@ -5,6 +5,7 @@
 #include "fluid_surfaces_renderer.h"
 #include "surface_smoothing_pass.h"
 #include "particle_render_pass.hpp"
+#include "depth_pass.hpp"
 #include "texture_renderer.h"
 #include "../utils/export_directives.h"
 #include "../utils/camera_controller.hpp"
@@ -39,6 +40,7 @@ private:
     FluidSurfaceRenderers *m_fluidSurfaces;
     SurfaceSmoothingPass* m_surfaceSmoothingPass;
     ParticleRenderPass* m_particleRenderPass;
+    DepthPass* m_depthPass;
     TextureRenderer *m_textureRenderer;
     GLuint m_currentVAO;
     

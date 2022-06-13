@@ -3,15 +3,14 @@
 #include "framebuffer.hpp"
 #include "renderer.h"
 #include "shader.h"
-#include <glm/glm.hpp>
 
 namespace fluidity
 {
 
-class ParticleRenderPass : public RenderPass
+class DepthPass : public RenderPass
 {
 public:
-    ParticleRenderPass(
+    DepthPass(
       const unsigned bufferWidth,
       const unsigned bufferHeight,
       const unsigned numberOfParticles,
@@ -21,15 +20,9 @@ public:
 
     virtual bool Init() override;
     virtual void Render() override;
+
 private:
     bool SetUniforms() override;
-
-    enum ColorMode 
-    {
-      COLOR_MODE_UNIFORM_MATERIAL = 0,
-      COLOR_MODE_RANDOM = 1,
-      COLOR_MODE_RAMP = 2
-    };
 };
 
 };

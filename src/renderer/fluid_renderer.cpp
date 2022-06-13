@@ -15,6 +15,7 @@ namespace fluidity
         m_fluidSurfaces(nullptr),
         m_textureRenderer(nullptr),
         m_particleRenderPass(nullptr),
+        m_depthPass(nullptr),
         m_currentVAO(0),
         m_uniformBufferCameraData(0),
         m_uniformBufferLights(0),
@@ -40,17 +41,21 @@ namespace fluidity
 
     auto FluidRenderer::SetVAO(GLuint vao) -> void
     {
+        // TODO: Have an array of RenderPass* so it is not needed to modify this method
+        // every time a new pass is added
         m_currentVAO = vao;
         m_fluidSurfaces->SetVAO(vao);
         m_particleRenderPass->SetParticlesVAO(vao);
+        m_depthPass->SetParticlesVAO(vao);
     }
 
     auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
     {
+        // TODO: Same as SetVao()
         m_currentNumberOfParticles = n;
-
         m_fluidSurfaces->SetNumberOfParticles(n);
         m_particleRenderPass->SetNumberOfParticles(n);
+        m_depthPass->SetNumberOfParticles(n);
     }
 
     auto FluidRenderer::SetFiltering(bool enabled) -> void
@@ -67,7 +72,9 @@ namespace fluidity
             m_windowHeight, 
             m_pointRadius,
             Camera::FAR_PLANE);
+
         m_textureRenderer = new TextureRenderer();
+
         m_surfaceSmoothingPass = new SurfaceSmoothingPass(
             m_windowWidth,
             m_windowHeight,
@@ -75,6 +82,14 @@ namespace fluidity
             5U);
 
         m_particleRenderPass = new ParticleRenderPass(
+            m_windowWidth,
+            m_windowHeight,
+            m_currentNumberOfParticles,
+            m_pointRadius,
+            m_currentVAO
+        );
+
+        m_depthPass = new DepthPass(
             m_windowWidth,
             m_windowHeight,
             m_currentNumberOfParticles,
@@ -102,6 +117,12 @@ namespace fluidity
         if(!m_surfaceSmoothingPass->Init())
         {
             LOG_ERROR("Unable to initialize surface smoothing pass.");
+            return false;
+        }
+
+        if(!m_depthPass->Init())
+        {
+            LOG_ERROR("Unable to initialize depth pass.");
             return false;
         }
 
@@ -172,6 +193,11 @@ namespace fluidity
           return false;
         }
 
+        if (!m_depthPass->SetUniformBuffer("CameraData", 0))
+        {
+          LOG_ERROR("Unable to set CameraData uniform buffer on Depth renderer");
+          return false;
+        }
         return true;
     }
 
@@ -289,9 +315,10 @@ namespace fluidity
         //     m_surfaceSmoothingPass->Render();
         // }
 
+        m_depthPass->Render();
         m_particleRenderPass->Render();
         m_textureRenderer->SetTexture(
-            m_particleRenderPass->GetBuffer()
+            m_depthPass->GetBuffer()
         );
 
         GLCall(glEnable(GL_DEPTH_TEST));
