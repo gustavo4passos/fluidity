@@ -4,16 +4,17 @@
 #include "renderer.h"
 #include "shader.h"
 
+/*
 namespace fluidity
 {
 
-class DepthPass : public RenderPass
+class NarrowRangeFilterPass : public RenderPass
 {
 public:
-    DepthPass(
-      int bufferWidth,
-      int bufferHeight,
-      int numberOfParticles,
+    NarrowRangeFilterPass(
+      const unsigned bufferWidth,
+      const unsigned bufferHeight,
+      const unsigned numberOfParticles,
       const float pointRadius,
       GLuint particlesVAO
     );
@@ -24,5 +25,5 @@ public:
 private:
     bool SetUniforms() override;
 };
-
-};
+}
+*/

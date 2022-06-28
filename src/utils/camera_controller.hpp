@@ -19,6 +19,7 @@ namespace fluidity
     float m_speed;
 
     glm::vec2 m_lastMousePosition;
+    bool m_mouseClicked;
     float m_yaw;
     float m_pitch;
 

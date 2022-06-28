@@ -4,9 +4,9 @@
 namespace fluidity
 {
 RenderPass::RenderPass(
-  const unsigned bufferWidth,
-  const unsigned bufferHeight,
-  const unsigned numberOfParticles,
+  int bufferWidth,
+  int bufferHeight,
+  int numberOfParticles,
   const float pointRadius,
   GLuint particlesVAO)
   : m_bufferWidth(bufferWidth),
@@ -14,7 +14,7 @@ RenderPass::RenderPass(
   m_numberOfParticles(numberOfParticles),
   m_pointRadius(pointRadius),
   m_particlesVAO(particlesVAO),
-  m_framebuffer({})
+  m_framebuffer({ {}, bufferWidth, bufferHeight }) // Sets a depth buffer attachment with same width/height
 { /* */ } 
 
 bool RenderPass::Init()

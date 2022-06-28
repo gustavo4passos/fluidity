@@ -8,7 +8,8 @@ namespace fluidity
     m_speed(.3f),
     m_movingOnAxis(0.f, 0.f, 0.f),
     m_yaw(0),
-    m_pitch(0)
+    m_pitch(0),
+    m_mouseClicked(false)
   { 
     // TODO: These should not be hardcoded
     m_yaw = 170;
@@ -97,18 +98,39 @@ namespace fluidity
         default: break;
       }
     }
+
+    if (e.type == SDL_MOUSEBUTTONDOWN)
+    {
+      if (e.button.button == SDL_BUTTON_LEFT)
+      {
+        m_mouseClicked = true;
+        int x, y;
+        SDL_GetMouseState(&x, &y);
+        m_lastMousePosition = glm::vec2(x, y);
+      }
+    }
+
+    if (e.type == SDL_MOUSEBUTTONUP)
+    {
+      if (e.button.button == SDL_BUTTON_LEFT)
+      {
+        m_mouseClicked = false;
+      }
+    }
   }
 
   void CameraController::ProcessMouse()
   {
+    if (!m_mouseClicked) return;
+
     int x, y;
     SDL_GetMouseState(&x, &y);
     glm::vec2 mouseMove = m_lastMousePosition - glm::vec2(x, y); 
     m_lastMousePosition = glm::vec2(x, y);
 
     float sensitivity = .2f; 
-    m_yaw   -= mouseMove.x * sensitivity;
-    m_pitch += mouseMove.y * sensitivity;
+    m_yaw   += mouseMove.x * sensitivity;
+    m_pitch -= mouseMove.y * sensitivity;
 
     if (m_pitch >  89.f) m_pitch =  89.f;
     if (m_pitch < -89.f) m_pitch = -89.f;

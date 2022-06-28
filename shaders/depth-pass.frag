@@ -88,5 +88,6 @@ void main()
     //calculate depth
     vec4 clipSpacePos = projectionMatrix * vec4(fragPos, 1.0);
     outDepth = fragPos.z;
+
     gl_FragDepth = clipSpacePos.z / clipSpacePos.w;
 }

@@ -1,5 +1,6 @@
 #include "depth_pass.hpp"
 #include "../utils/glcall.h"
+#include "../utils/opengl_utils.hpp"
 #include "../Vec.hpp"
 #include <cassert>
 #include <limits>
@@ -7,9 +8,9 @@
 namespace fluidity
 {
 DepthPass::DepthPass(
-    const unsigned bufferWidth,
-    const unsigned bufferHeight,
-    const unsigned numberOfParticles,
+    int bufferWidth,
+    int bufferHeight,
+    int numberOfParticles,
     const float pointRadius,
     GLuint particlesVAO)
     : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO)
@@ -18,7 +19,7 @@ DepthPass::DepthPass(
 bool DepthPass::Init()
 {
   m_shader = new Shader("../../shaders/depth-pass.vert", "../../shaders/depth-pass.frag");
-  m_framebuffer.PushAttachment({ GL_RED, (int)m_bufferWidth, (int)m_bufferHeight, 
+  m_framebuffer.PushAttachment({ GL_R32F, (int)m_bufferWidth, (int)m_bufferHeight, 
       GL_RED, GL_FLOAT
   });
 
@@ -49,9 +50,11 @@ void DepthPass::Render()
 
   GLCall(glEnable(GL_DEPTH_TEST));
 
+  // Maximum possible distane
   constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
   GLCall(glClearColor(minusInfinity, minusInfinity, minusInfinity, 1.0));
   GLCall(glClear(GL_COLOR_BUFFER_BIT));
+  GLCall(glClear(GL_DEPTH_BUFFER_BIT));
   GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
 
   GLCall(glBindVertexArray(0));
@@ -67,6 +70,7 @@ void DepthPass::Render()
     GLCall(glDisable(GL_DEPTH_TEST));
   }
 
+  // Restore previous clear color
   glClearColor(currentClearColor.x, currentClearColor.y, currentClearColor.z, currentClearColor.w);
 }
 
@@ -81,4 +85,5 @@ bool DepthPass::SetUniforms()
 
   return true;
 }
+
 }

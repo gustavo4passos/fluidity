@@ -9,9 +9,9 @@ class RenderPass
 {
 public:
   RenderPass(
-    const unsigned bufferWidth,
-    const unsigned bufferHeight,
-    const unsigned numberOfParticles,
+    int bufferWidth,
+    int bufferHeight,
+    int numberOfParticles,
     const float pointRadius,
     GLuint particlesVAO
   );

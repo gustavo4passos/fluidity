@@ -16,6 +16,7 @@ namespace fluidity
         m_textureRenderer(nullptr),
         m_particleRenderPass(nullptr),
         m_depthPass(nullptr),
+        m_filterPass(nullptr),
         m_currentVAO(0),
         m_uniformBufferCameraData(0),
         m_uniformBufferLights(0),
@@ -97,6 +98,12 @@ namespace fluidity
             m_currentVAO
         );
 
+        m_filterPass = new FilterPass(
+            m_windowWidth,
+            m_windowHeight,
+            m_pointRadius
+        );
+
         if  (!m_particleRenderPass->Init())
         {
             LOG_ERROR("Unable to initialize particle render pass.");
@@ -126,6 +133,12 @@ namespace fluidity
             return false;
         }
 
+        if(!m_filterPass->Init())
+        {
+            LOG_ERROR("Unable to initialize filter pass.");
+            return false;
+        }
+
         if (!InitUniformBuffers()) return false;
 
         SetUpLights();
@@ -137,6 +150,11 @@ namespace fluidity
     auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
     {
       m_cameraController.ProcessInput(e);
+
+      if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f)
+      {
+        SetFiltering(!m_filteringEnabled);
+      }
     }
 
     auto FluidRenderer::InitUniformBuffers() -> bool
@@ -208,11 +226,11 @@ namespace fluidity
       light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
       light.specular = { 1.f, 1.f, 1.f, 1.f };
 
-      light.position = { -1, 20.f, 10.f, 1.f };
+      light.position = { -10, 20.f, 10.f, 1.f };
 
       PointLight light2;
-      light2.ambient  = { .5f, .5f, .5f, 1.f };
-      light2.diffuse  = { 1.f, 1.f, 1.f, 1.f };
+      light2.ambient  = { .1f, .1f, .1f, 1.f };
+      light2.diffuse  = { .3f, .3f, .3f, 1.f };
       light2.specular = { 1.f, 1.f, 1.f, 1.f };
       light.position = { 10, -20.f, -10.f, 1.f };
 
@@ -222,8 +240,11 @@ namespace fluidity
       glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights);
       // Upload light 1
       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(PointLight), &light);
-      glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight), sizeof(PointLight), &light);
 
+      // Upload light 2
+      glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight), sizeof(PointLight), &light2);
+
+      // Upload number of lights
       glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights);
       glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
@@ -269,44 +290,7 @@ namespace fluidity
         GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 3,  sizeof(glm::mat4), 
               glm::value_ptr(glm::inverse(projection))));
         GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
- 
 
-#if UNIFORM_MATRICES_ENABLED
-        GLCall(glEnable(GL_DEPTH_TEST));
-        Clear();
-        m_particleRenderPass->SetTransformationMatrices(
-            projectionMatrix,
-            view
-        );
-
-        m_fluidSurfaces->SetTransformationMatrices(
-            projectionMatrix, 
-            view);
-
-        m_surfaceSmoothingPass->SetTransformationMatrices(
-            projectionMatrix,
-            view
-        );
-#endif
-
-
-#if FILTERING_ENABLED
-        m_fluidSurfaces->Render();
-
-        m_surfaceSmoothingPass->SetUnfilteredSurfaces(
-            m_fluidSurfaces->GetFrontSurface());
-        m_surfaceSmoothingPass->Render();
-
-
-        m_textureRenderer->SetTexture(
-            m_filteringEnabled ? 
-            m_surfaceSmoothingPass->GetSmoothedSurfaces() :
-            m_fluidSurfaces->GetFrontSurface());
-        
-
-        m_textureRenderer->SetTexture(
-            m_fluidSurfaces->GetFrontSurface());
-#endif
 
         // for (int i = 0; i < 4; i++)
         // {
@@ -315,15 +299,17 @@ namespace fluidity
         //     m_surfaceSmoothingPass->Render();
         // }
 
-        m_depthPass->Render();
         m_particleRenderPass->Render();
+        m_depthPass->Render();
+
+        m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+        m_filterPass->Render();
+
         m_textureRenderer->SetTexture(
-            m_depthPass->GetBuffer()
+            m_filteringEnabled ? m_filterPass->GetBuffer() : m_depthPass->GetBuffer()
         );
 
-        GLCall(glEnable(GL_DEPTH_TEST));
         Clear();
-
         m_textureRenderer->Render();
     }
 }

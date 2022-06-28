@@ -12,6 +12,9 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
 
 bool Framebuffer::Init()
 {
+  glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
+  glClampColor(GL_CLAMP_VERTEX_COLOR, GL_FALSE);
+  glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
   // TODO: Invalidate framebuffer before initializing it, in case it is called
   // more than once (when an attachment is added after it has already been initalized,
   // for example)
@@ -25,6 +28,11 @@ bool Framebuffer::Init()
     InitAttachment(a);
     int currentAttachment = attachments.size();
     attachments.push_back((GLenum)(GL_COLOR_ATTACHMENT0 + currentAttachment));
+  }
+
+  if (m_specification.depthBufferWidth > 0 && m_specification.depthBufferHeight > 0) 
+  {
+    AttachDepthBuffer();
   }
 
   // TODO: Clean up in case of failure
@@ -60,6 +68,16 @@ void Framebuffer::InitAttachment(const FramebufferAttachment& attachment)
           GL_TEXTURE_2D, texture, 0));
 
     m_attachments.push_back(texture);
+}
+
+void Framebuffer::AttachDepthBuffer()
+{
+  GLCall(glGenRenderbuffers(1, &m_depthAttachment));
+  GLCall(glBindRenderbuffer(GL_RENDERBUFFER, m_depthAttachment));
+  GLCall(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 
+        m_specification.depthBufferWidth, m_specification.depthBufferHeight));
+  GLCall(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthAttachment));
+  GLCall(glBindRenderbuffer(GL_RENDERBUFFER, 0));
 }
 
 void Framebuffer::Bind()

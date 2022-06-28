@@ -47,31 +47,26 @@ bool Window::Init() {
   if(_windowHndl == nullptr) {
     LOG_ERROR("Unable to create window. " + std::string(SDL_GetError()));
     return false;
-  }
-  else {
-    _openGLContext = SDL_GL_CreateContext(_windowHndl);
-    if(_openGLContext == nullptr) {
-      LOG_ERROR("Unable to create OpenGL context. " + std::string(SDL_GetError()));
-      return false;
-    }
-    else {
-      glewExperimental = true;
-      GLenum glewInitStatus = glewInit();
-      if(glewInitStatus != GLEW_OK) {
-        LOG_ERROR("Unable to initialize Glew. " +
-          std::string((char*)glewGetErrorString(glewInitStatus)));
-        return false;
-      }
-      else {
 
-        if(_vsync) {
-          SetVsync(true);
-        }
-        if(_fullscreen) {
-          SetFullscreen(true);
-        }
-      }
-    }
+  }
+  _openGLContext = SDL_GL_CreateContext(_windowHndl);
+  if(_openGLContext == nullptr) {
+    LOG_ERROR("Unable to create OpenGL context. " + std::string(SDL_GetError()));
+    return false;
+  }
+  glewExperimental = true;
+  GLenum glewInitStatus = glewInit();
+  if(glewInitStatus != GLEW_OK) {
+    LOG_ERROR("Unable to initialize Glew. " +
+      std::string((char*)glewGetErrorString(glewInitStatus)));
+    return false;
+  }
+
+  if(_vsync) {
+    SetVsync(true);
+  }
+  if(_fullscreen) {
+    SetFullscreen(true);
   }
 	
   return true;

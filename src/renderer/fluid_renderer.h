@@ -6,6 +6,7 @@
 #include "surface_smoothing_pass.h"
 #include "particle_render_pass.hpp"
 #include "depth_pass.hpp"
+#include "filter_pass.hpp"
 #include "texture_renderer.h"
 #include "../utils/export_directives.h"
 #include "../utils/camera_controller.hpp"
@@ -42,6 +43,7 @@ private:
     ParticleRenderPass* m_particleRenderPass;
     DepthPass* m_depthPass;
     TextureRenderer *m_textureRenderer;
+    FilterPass* m_filterPass;
     GLuint m_currentVAO;
     
     GLuint m_uniformBufferCameraData;
@@ -53,7 +55,6 @@ private:
     unsigned m_currentNumberOfParticles;
     unsigned m_windowWidth;
     unsigned m_windowHeight;
-
 
     float m_aspectRatio;
     float m_pointRadius;

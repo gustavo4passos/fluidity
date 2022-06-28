@@ -100,11 +100,6 @@ int main(int argc, char* args[])
                         running = false;
                     } break;
 
-                    case SDLK_f: 
-                    {
-                        renderer->SetFiltering(!renderer->GetFiltering());
-                    } break;
-
                     case SDLK_SPACE:
                     {
                         playing = !playing;

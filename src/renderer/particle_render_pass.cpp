@@ -47,6 +47,7 @@ ParticleRenderPass::ParticleRenderPass(
         GLCall(glEnable(GL_DEPTH_TEST));
 
         GLCall(glClear(GL_COLOR_BUFFER_BIT));
+        GLCall(glClear(GL_DEPTH_BUFFER_BIT));
         GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
 
         GLCall(glBindVertexArray(0));

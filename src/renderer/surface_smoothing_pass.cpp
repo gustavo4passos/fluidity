@@ -1,7 +1,7 @@
 #include "surface_smoothing_pass.h"
 #include "../utils/logger.h"
 #include "../utils/glcall.h"
-#include <assert.h>
+#include <cassert>
 #include <glm/gtc/type_ptr.hpp>
 
 namespace fluidity
