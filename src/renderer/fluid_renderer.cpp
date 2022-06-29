@@ -106,10 +106,19 @@ auto FluidRenderer::Init() -> bool
       true
   );
 
+  m_compositionPass = new FilterPass(
+    m_windowWidth,
+    m_windowHeight,
+    m_pointRadius,
+    { GL_RGBA32F, GL_RGBA, GL_FLOAT },
+    "../../shaders/composition-pass.frag"
+  );
+
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
   m_renderPasses["FilterPass"]         = m_filterPass;
   m_renderPasses["NormalPass"]         = m_normalPass;
+  m_renderPasses["CompositionPass"]    = m_compositionPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -160,6 +169,18 @@ auto FluidRenderer::Init() -> bool
     normalPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     normalPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     normalPassShader.Unbind();
+  }
+
+  // Composoition pass -> Init uniforms 
+  {
+    auto& compositionPassShader = m_compositionPass->GetShader();
+    compositionPassShader.Bind();
+    compositionPassShader.SetUniform1i("u_HasSolid", 0);
+    compositionPassShader.SetUniform1i("u_HasShadow", 0);
+    compositionPassShader.SetUniform1i("u_DepthTex", 0);
+    compositionPassShader.SetUniform1i("u_NormalTex", 1);
+    compositionPassShader.SetUniform1i("u_TransparentFluid", 0);
+    compositionPassShader.Unbind();
   }
 
   if (!InitUniformBuffers()) return false;
@@ -258,7 +279,7 @@ auto FluidRenderer::SetUpMaterial() -> void
 {
   Material material;
   material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
-  material.diffuse   = { 0.f, 1.f, 0.f, 1.f };
+  material.diffuse   = { 0.2f, 0.2f, 0.7f, 1.f };
   material.specular  = { 1.f, 1.f, 1.f, 1.f };
   material.shininess = 250;
 
@@ -289,9 +310,13 @@ auto FluidRenderer::Render() -> void
   m_normalPass->SetInputTexture(m_filterPass->GetBuffer());
   m_normalPass->Render();
 
+  m_compositionPass->SetInputTexture(m_filterPass->GetBuffer(), 0);
+  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 1);
+  m_compositionPass->Render();
+
 #if true
   m_textureRenderer->SetTexture(
-      m_filteringEnabled ? m_filterPass->GetBuffer() : m_normalPass->GetBuffer()
+      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_normalPass->GetBuffer()
       );
 #else
   m_textureRenderer->SetTexture(

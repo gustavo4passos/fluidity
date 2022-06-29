@@ -45,6 +45,7 @@ private:
   TextureRenderer*    m_textureRenderer;
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
+  FilterPass*         m_compositionPass;
 
   GLuint m_currentVAO;
 

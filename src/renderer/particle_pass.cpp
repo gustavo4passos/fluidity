@@ -56,7 +56,7 @@ void ParticlePass::Render()
 
   GLCall(glEnable(GL_DEPTH_TEST));
 
-  // Maximum possible distane
+  // Maximum possible distance
   constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
   GLCall(glClearColor(minusInfinity, minusInfinity, minusInfinity, 1.0));
   GLCall(glClear(GL_COLOR_BUFFER_BIT));
