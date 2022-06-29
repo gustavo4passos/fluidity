@@ -8,17 +8,25 @@ namespace fluidity
 FilterPass::FilterPass(
     int bufferWidth,
     int bufferHeight,
-    const float pointRadius
+    const float pointRadius,
+    const FramebufferAttachment& renderTargetSpecification,
+    const std::string& fsFilePath,
+    const bool useDoubleBuffer
     )
-    : RenderPass(bufferWidth, bufferHeight, 0, pointRadius, 0)
+    : RenderPass(bufferWidth, bufferHeight, 0, pointRadius, 0),
+    m_fsFilePath(fsFilePath),
+    m_renderTargetSpecification(renderTargetSpecification),
+    m_useDoubleBuffer(useDoubleBuffer)
     { /* */ }
 
 bool FilterPass::Init()
 {
-  m_shader = new Shader("../../shaders/quad_rendering.vert", "../../shaders/filter-narrow-range.frag");
-  m_framebuffer.PushAttachment({ GL_R32F, (int)m_bufferWidth, (int)m_bufferHeight, 
-      GL_RED, GL_FLOAT
+  m_shader = new Shader("../../shaders/quad_rendering.vert", m_fsFilePath);
+  m_framebuffer.PushAttachment({ m_renderTargetSpecification.internalFormat, 
+      m_renderTargetSpecification.pixelFormat, m_renderTargetSpecification.dataType
   });
+
+  if (m_useDoubleBuffer) m_framebuffer.DuplicateAttachment(0);
 
   if (!RenderPass::Init()) return false;
 
@@ -109,9 +117,23 @@ void FilterPass::SetInputTexture(GLuint texture, int slot)
   m_textureBinds[slot] = texture;
 }
 
+void FilterPass::SwapBuffers(int textureSlot)
+{
+  assert(m_useDoubleBuffer);
+
+  // Set current render target as input texture
+  SetInputTexture(m_framebuffer.GetAttachment(0));
+
+  m_framebuffer.Bind();
+  m_framebuffer.SwapRenderTargets();
+  // Detach render target 1, since it's being used as an input texture now
+  m_framebuffer.DetachRenderTarget(1);
+  m_framebuffer.Unbind();
+}
+
 void FilterPass::BindTextures()
 {
-  for (auto& tPair : m_textureBinds)
+ for (auto& tPair : m_textureBinds)
   {
     GLCall(glActiveTexture(GL_TEXTURE0 + tPair.first));
     GLCall(glBindTexture(GL_TEXTURE_2D, tPair.second));

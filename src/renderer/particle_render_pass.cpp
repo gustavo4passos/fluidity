@@ -18,9 +18,7 @@ ParticleRenderPass::ParticleRenderPass(
     bool ParticleRenderPass::Init()
     {
         m_shader = new Shader("../../shaders/particle.vert", "../../shaders/particle.frag");
-        m_framebuffer.PushAttachment({ GL_RGBA32F, (int)m_bufferWidth, (int)m_bufferHeight, 
-            GL_RGBA, GL_FLOAT
-        });
+        m_framebuffer.PushAttachment({ GL_RGBA32F, GL_RGBA, GL_FLOAT });
         
         if (!RenderPass::Init()) return false;
 

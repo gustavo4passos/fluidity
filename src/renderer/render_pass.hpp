@@ -25,6 +25,9 @@ public:
   virtual void SetNumberOfParticles(unsigned nParticles) { m_numberOfParticles = nParticles; }
   virtual bool SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding);
 
+  Shader& GetShader();
+  Framebuffer& GetFramebuffer() { return m_framebuffer; }
+
 protected:
   virtual bool SetUniforms() { return true; }
   Shader* m_shader; 

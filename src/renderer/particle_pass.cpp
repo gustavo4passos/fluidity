@@ -1,4 +1,4 @@
-#include "depth_pass.hpp"
+#include "particle_pass.hpp"
 #include "../utils/glcall.h"
 #include "../utils/opengl_utils.hpp"
 #include "../Vec.hpp"
@@ -7,26 +7,34 @@
 
 namespace fluidity
 {
-DepthPass::DepthPass(
+ParticlePass::ParticlePass(
     int bufferWidth,
     int bufferHeight,
     int numberOfParticles,
     const float pointRadius,
-    GLuint particlesVAO)
-    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO)
+    GLuint particlesVAO,
+    FramebufferAttachment renderTargetSpecification,
+    const std::string& vsFilepath,
+    const std::string& fsFilepath)
+    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO),
+      m_renderTargetSpecification(renderTargetSpecification),
+      m_vsFilePath(vsFilepath),
+      m_fsFilePath(fsFilepath)
     { /* */ }
 
-bool DepthPass::Init()
+bool ParticlePass::Init()
 {
-  m_shader = new Shader("../../shaders/depth-pass.vert", "../../shaders/depth-pass.frag");
-  m_framebuffer.PushAttachment({ GL_R32F, GL_RED, GL_FLOAT });
+  m_shader = new Shader(m_vsFilePath, m_fsFilePath);
+  m_framebuffer.PushAttachment({ m_renderTargetSpecification.internalFormat, 
+      m_renderTargetSpecification.pixelFormat, m_renderTargetSpecification.dataType
+  });
 
   if (!RenderPass::Init()) return false;
 
   return true;
 }
 
-void DepthPass::Render()
+void ParticlePass::Render()
 {
   assert(m_shader != nullptr);
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
@@ -49,8 +57,7 @@ void DepthPass::Render()
   GLCall(glEnable(GL_DEPTH_TEST));
 
   // Maximum possible distane
-  // constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
-  constexpr float minusInfinity = -1000000;
+  constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
   GLCall(glClearColor(minusInfinity, minusInfinity, minusInfinity, 1.0));
   GLCall(glClear(GL_COLOR_BUFFER_BIT));
   GLCall(glClear(GL_DEPTH_BUFFER_BIT));
@@ -71,18 +78,6 @@ void DepthPass::Render()
 
   // Restore previous clear color
   glClearColor(currentClearColor.x, currentClearColor.y, currentClearColor.z, currentClearColor.w);
-}
-
-bool DepthPass::SetUniforms()
-{
-  m_shader->Bind();
-  m_shader->SetUniform1i("u_UseAnisotropyKernel", 0);
-  m_shader->SetUniform1f("u_PointRadius", (float)m_pointRadius);
-  m_shader->SetUniform1i("u_ScreenWidth", m_bufferWidth);
-  m_shader->SetUniform1i("u_ScreenHeight", m_bufferHeight);
-  m_shader->Unbind(); 
-
-  return true;
 }
 
 }

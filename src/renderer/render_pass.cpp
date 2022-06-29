@@ -1,5 +1,6 @@
 #include "render_pass.hpp"
 #include "../utils/glcall.h"
+#include <cassert>
 
 namespace fluidity
 {
@@ -14,7 +15,7 @@ RenderPass::RenderPass(
   m_numberOfParticles(numberOfParticles),
   m_pointRadius(pointRadius),
   m_particlesVAO(particlesVAO),
-  m_framebuffer({ {}, bufferWidth, bufferHeight }) // Sets a depth buffer attachment with same width/height
+  m_framebuffer({ {}, bufferWidth, bufferHeight }) 
 { /* */ } 
 
 bool RenderPass::Init()
@@ -34,4 +35,11 @@ bool RenderPass::SetUniformBuffer(const std::string& name, GLuint uniformBlockBi
   
   return true;
 }
+
+Shader& RenderPass::GetShader()
+{
+  assert(m_shader != nullptr);
+  return *m_shader;
+}
+
 }
