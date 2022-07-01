@@ -15,7 +15,8 @@ RenderPass::RenderPass(
   m_numberOfParticles(numberOfParticles),
   m_pointRadius(pointRadius),
   m_particlesVAO(particlesVAO),
-  m_framebuffer({ {}, bufferWidth, bufferHeight }) 
+  m_framebuffer({ {}, bufferWidth, bufferHeight }),
+  m_renderState({})
 { /* */ } 
 
 bool RenderPass::Init()
@@ -35,6 +36,39 @@ bool RenderPass::SetUniformBuffer(const std::string& name, GLuint uniformBlockBi
   
   return true;
 }
+
+void RenderPass::ChangeOpenGLRenderState(const RenderState& state)
+{
+  if (state.useDepthTest) glEnable(GL_DEPTH_TEST);
+  else glDisable(GL_DEPTH_TEST);
+
+  if (state.useBlend) glEnable(GL_BLEND);
+  else glDisable(GL_BLEND);
+
+  glClearColor(state.clearColor.x, state.clearColor.y, state.clearColor.z, state.clearColor.w);
+  glBlendFunc(state.blendSourceFactor, state.blendDestinationFactor);
+}
+
+RenderState RenderPass::GetCurrentOpenGLRenderState()
+{
+  RenderState currentState;
+
+  GLboolean depthTestEnabled;
+  GLboolean blendEnabled;
+  GLint blendSourceFactor;
+  GLint blendDestinationFactor;
+  Vec4 currentClearColor;
+
+  GLCall(glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled));
+  GLCall(glGetBooleanv(GL_BLEND, &blendEnabled));
+  GLCall(glGetIntegerv(GL_BLEND_SRC_RGB, &blendSourceFactor));
+  GLCall(glGetIntegerv(GL_BLEND_DST_RGB, &blendDestinationFactor));
+  GLCall(glGetFloatv(GL_COLOR_CLEAR_VALUE, (float*)(&currentClearColor)));
+
+  return { (bool)depthTestEnabled, (bool)blendEnabled, (GLenum)blendSourceFactor, 
+    (GLenum)blendDestinationFactor };
+}
+
 
 Shader& RenderPass::GetShader()
 {

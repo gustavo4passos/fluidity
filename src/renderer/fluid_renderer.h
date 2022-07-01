@@ -40,9 +40,10 @@ private:
   auto UploadCameraData()   -> void;
 
   // Render passes
+  TextureRenderer*    m_textureRenderer;
   ParticleRenderPass* m_particleRenderPass;
   ParticlePass*       m_depthPass;
-  TextureRenderer*    m_textureRenderer;
+  ParticlePass*       m_thicknessPass;
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
@@ -57,6 +58,7 @@ private:
   GLuint m_uniformBufferMaterial;
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
+  int m_nFilterIterations;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;

@@ -17,7 +17,9 @@ FilterPass::FilterPass(
     m_fsFilePath(fsFilePath),
     m_renderTargetSpecification(renderTargetSpecification),
     m_useDoubleBuffer(useDoubleBuffer)
-    { /* */ }
+{ 
+  m_renderState.useDepthTest = false;
+}
 
 bool FilterPass::Init()
 {
@@ -27,7 +29,6 @@ bool FilterPass::Init()
   });
 
   if (m_useDoubleBuffer) m_framebuffer.DuplicateAttachment(0);
-
   if (!RenderPass::Init()) return false;
 
   InitQuadVao();
@@ -87,29 +88,21 @@ void FilterPass::Render()
   // Sanity check
   assert(m_shader != nullptr);
 
+  RenderState previousRenderState = GetCurrentOpenGLRenderState();
+  ChangeOpenGLRenderState(m_renderState);
+
   m_framebuffer.Bind();
   m_shader->Bind();
-  
+
   BindTextures();
   GLCall(glBindVertexArray(m_quadVao));
   GLCall(glDrawArrays(GL_TRIANGLES, 0, 6));
 
   m_shader->Unbind();
   m_framebuffer.Unbind();
-}
 
-bool FilterPass::SetUniforms()
-{
-  m_shader->Bind();
-  m_shader->SetUniform1i("u_DoFilter1D", 0);
-  m_shader->SetUniform1i("u_FilterSize", 5);
-  m_shader->SetUniform1i("u_ScreenWidth", m_bufferWidth);
-  m_shader->SetUniform1i("u_ScreenHeight", m_bufferHeight);
-  m_shader->SetUniform1i("u_MaxFilterSize", 100);
-  m_shader->SetUniform1f("u_ParticleRadius", m_pointRadius);
-  m_shader->Unbind();
-
-  return true;
+  // Restore previous render state
+  ChangeOpenGLRenderState(previousRenderState);
 }
 
 void FilterPass::SetInputTexture(GLuint texture, int slot)

@@ -27,7 +27,6 @@ public:
     virtual void SwapBuffers(int textureSlot = 0);
 
 protected:
-    virtual bool SetUniforms() override;
     void InitQuadVao();
     void BindTextures();
     void UnbindTextures();

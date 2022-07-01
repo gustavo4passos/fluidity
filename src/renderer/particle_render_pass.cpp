@@ -30,20 +30,15 @@ ParticleRenderPass::ParticleRenderPass(
         assert(m_shader != nullptr);
 
         // Save OpenGL state before changing it
-        GLboolean isBlendEnabled;
-        GLboolean isDepthTestEnabled;
-        GLCall(glGetBooleanv(GL_BLEND, &isBlendEnabled));
-        GLCall(glGetBooleanv(GL_DEPTH_TEST, &isDepthTestEnabled));
+        RenderState previousRenderState;
+        previousRenderState = GetCurrentOpenGLRenderState();
 
         m_framebuffer.Bind();
         m_shader->Bind();
 
+        ChangeOpenGLRenderState(m_renderState);
+
         GLCall(glBindVertexArray(m_particlesVAO));
-        // glBindTexture(GL_TEXTURE_2D, m_buffer);
-
-        GLCall(glEnable(GL_BLEND));
-        GLCall(glEnable(GL_DEPTH_TEST));
-
         GLCall(glClear(GL_COLOR_BUFFER_BIT));
         GLCall(glClear(GL_DEPTH_BUFFER_BIT));
         GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
@@ -52,14 +47,7 @@ ParticleRenderPass::ParticleRenderPass(
         m_shader->Unbind();
         m_framebuffer.Unbind();
 
-        if (!isBlendEnabled)
-        {
-          GLCall(glDisable(GL_BLEND));
-        }
-        if (!isDepthTestEnabled)
-        {
-          GLCall(glDisable(GL_DEPTH_TEST));
-        }
+        ChangeOpenGLRenderState(m_renderState);
     }
 
     bool ParticleRenderPass::SetUniforms()

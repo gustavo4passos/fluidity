@@ -1,7 +1,8 @@
 #include "fluid_renderer.h"
-#include "../utils/glcall.h"
+#include "utils/glcall.h"
+#include "utils/opengl_utils.hpp"
 #include "../utils/logger.h"
-#include "../Vec.hpp"
+#include "../vec.hpp"
 #include <SDL2/SDL.h>
 #include <cmath>
 #include <glm/glm.hpp>
@@ -26,7 +27,8 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_aspectRatio((float) windowWidth / windowHeight),
   m_pointRadius(pointRadius),
   m_filteringEnabled(true),
-  m_cameraController(Camera({ 9.66f, 7.73f, 5}, 45.f))
+  m_cameraController(Camera({ 9.66f, 7.73f, 5}, 45.f)),
+  m_nFilterIterations(3) //TODO: Should be configurable
   { /* */ }
 
 auto FluidRenderer::Clear() -> void
@@ -89,6 +91,17 @@ auto FluidRenderer::Init() -> bool
       "../../shaders/depth-pass.frag"
   );
 
+  m_thicknessPass = new ParticlePass(
+    m_windowWidth,
+    m_windowHeight,
+    m_currentNumberOfParticles,
+    m_pointRadius * 1.2f,
+    m_currentVAO,
+    { GL_R32F, GL_RED, GL_FLOAT },
+    "../../shaders/thickness-pass.vert",
+    "../../shaders/thickness-pass.frag"
+  );
+
   m_normalPass = new FilterPass(
       m_windowWidth,
       m_windowHeight,
@@ -114,11 +127,13 @@ auto FluidRenderer::Init() -> bool
     "../../shaders/composition-pass.frag"
   );
 
+
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
   m_renderPasses["FilterPass"]         = m_filterPass;
   m_renderPasses["NormalPass"]         = m_normalPass;
   m_renderPasses["CompositionPass"]    = m_compositionPass;
+  m_renderPasses["ThicknessPass"]      = m_thicknessPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -147,11 +162,31 @@ auto FluidRenderer::Init() -> bool
     depthPassShader.Unbind(); 
   }
 
+  // Thickness pass -> Init uniforms, set up render state
+  {
+    auto renderState = m_thicknessPass->GetRenderState();
+    renderState.useBlend                = true;
+    renderState.useDepthTest            = false;
+    renderState.blendSourceFactor       = GL_ONE;
+    renderState.blendDestinationFactor  = GL_ONE;
+    renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 1.f };
+    m_thicknessPass->SetRenderState(renderState);
+
+    auto& thicknessPassShader = m_thicknessPass->GetShader();
+    thicknessPassShader.Bind();
+    thicknessPassShader.SetUniform1i("u_UseAnisotropyKernel", 0);
+    thicknessPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius);
+    thicknessPassShader.SetUniform1f("u_PointScale", 
+      (float)m_windowHeight / std::tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
+    thicknessPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
+    thicknessPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
+    thicknessPassShader.SetUniform1i("u_hasSolid", 0);
+    thicknessPassShader.Unbind();
+  }
+  
   // Narrow filter pass -> Init uniforms
   {
     auto& narrowFilterShader = m_filterPass->GetShader();
-    std::cout << "m_windowWidth: " << m_windowWidth << "\n";
-    std::cout << "m_windowHeight: " << m_windowHeight << "\n";
     narrowFilterShader.Bind();
     narrowFilterShader.SetUniform1i("u_DoFilter1D", 0);
     narrowFilterShader.SetUniform1i("u_FilterSize", 5);
@@ -161,7 +196,7 @@ auto FluidRenderer::Init() -> bool
     narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
     narrowFilterShader.Unbind();
   }
-  
+
   // Normal pass -> Init uniforms 
   {
     auto& normalPassShader = m_normalPass->GetShader();
@@ -173,13 +208,20 @@ auto FluidRenderer::Init() -> bool
 
   // Composoition pass -> Init uniforms 
   {
+    auto renderState = m_compositionPass->GetRenderState();
+    renderState.clearColor = { .5f, .5f, .5f, 1.f };
+    m_compositionPass->SetRenderState(renderState);
+
     auto& compositionPassShader = m_compositionPass->GetShader();
     compositionPassShader.Bind();
     compositionPassShader.SetUniform1i("u_HasSolid", 0);
     compositionPassShader.SetUniform1i("u_HasShadow", 0);
     compositionPassShader.SetUniform1i("u_DepthTex", 0);
-    compositionPassShader.SetUniform1i("u_NormalTex", 1);
-    compositionPassShader.SetUniform1i("u_TransparentFluid", 0);
+    compositionPassShader.SetUniform1i("u_ThicknessTex", 1);
+    compositionPassShader.SetUniform1i("u_NormalTex", 2);
+    compositionPassShader.SetUniform1i("u_TransparentFluid", 1);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", 75.f);
+    compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
 
@@ -199,6 +241,27 @@ auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void
   {
     SetFiltering(!m_filteringEnabled);
   }
+
+  if (e.type == SDL_KEYUP)
+  {
+    switch (e.key.keysym.sym)
+    {
+      case (SDLK_UP):
+      {
+        m_nFilterIterations++;
+        break;
+      } 
+      case (SDLK_DOWN):
+      {
+        m_nFilterIterations--;
+        break;
+      }
+
+      default: break;
+    }
+  }
+
+  if (m_nFilterIterations < 1) m_nFilterIterations = 1;
 }
 
 auto FluidRenderer::InitUniformBuffers() -> bool
@@ -298,9 +361,13 @@ auto FluidRenderer::Render() -> void
   UploadCameraData();
   m_particleRenderPass->Render();
   m_depthPass->Render();
+  m_thicknessPass->Render();
 
-  constexpr int FILTER_ITERATIONS = 3;
-  for (int i = 0; i < FILTER_ITERATIONS; i++)
+  // m_thicknessPass->GetFramebuffer().Bind();
+  // PrintCurrentColorFramebuffer(m_windowWidth, m_windowHeight, GL_R32F, GL_FLOAT);
+  // m_thicknessPass->GetFramebuffer().Unbind();
+
+  for (int i = 0; i < m_nFilterIterations; i++)
   {
     if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
     else m_filterPass->SwapBuffers();
@@ -311,18 +378,14 @@ auto FluidRenderer::Render() -> void
   m_normalPass->Render();
 
   m_compositionPass->SetInputTexture(m_filterPass->GetBuffer(), 0);
-  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 1);
+  m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(), 1);
+  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 2);
   m_compositionPass->Render();
 
-#if true
   m_textureRenderer->SetTexture(
-      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_normalPass->GetBuffer()
-      );
-#else
-  m_textureRenderer->SetTexture(
-     m_particleRenderPass->GetBuffer() 
+      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_thicknessPass->GetBuffer()
   );
-#endif
+
 
   Clear();
   m_textureRenderer->Render();

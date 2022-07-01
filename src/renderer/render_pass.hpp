@@ -1,9 +1,19 @@
 #pragma once
 #include "framebuffer.hpp"
 #include "shader.h"
+#include "vec.hpp"
 
 namespace fluidity
 {
+
+struct RenderState
+{
+  bool useDepthTest = true;
+  bool useBlend = false;
+  GLenum blendSourceFactor = GL_ONE;
+  GLenum blendDestinationFactor = GL_ZERO;
+  Vec4 clearColor = { 0.f, 0.f, 0.f, 1.f };
+};
 
 class RenderPass
 {
@@ -28,7 +38,13 @@ public:
   Shader& GetShader();
   Framebuffer& GetFramebuffer() { return m_framebuffer; }
 
+  virtual void SetRenderState(const RenderState& state) { m_renderState = state; };
+  virtual const RenderState& GetRenderState() { return m_renderState; } 
+
 protected:
+  virtual void ChangeOpenGLRenderState(const RenderState& state);
+  virtual RenderState GetCurrentOpenGLRenderState();
+
   virtual bool SetUniforms() { return true; }
   Shader* m_shader; 
   unsigned m_bufferWidth;
@@ -38,6 +54,7 @@ protected:
 
   GLuint m_particlesVAO;
   Framebuffer m_framebuffer;
+  RenderState m_renderState;
 };
 
 }

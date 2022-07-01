@@ -3,7 +3,7 @@
 #include <cnpy.h>
 #include <vector>
 #include <GL/glew.h>
-#include "Vec.hpp"
+#include "vec.hpp"
 
 
 class Fluid {

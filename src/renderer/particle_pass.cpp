@@ -1,9 +1,10 @@
 #include "particle_pass.hpp"
 #include "../utils/glcall.h"
 #include "../utils/opengl_utils.hpp"
-#include "../Vec.hpp"
+#include "../vec.hpp"
 #include <cassert>
 #include <limits>
+#include <cmath>
 
 namespace fluidity
 {
@@ -20,7 +21,11 @@ ParticlePass::ParticlePass(
       m_renderTargetSpecification(renderTargetSpecification),
       m_vsFilePath(vsFilepath),
       m_fsFilePath(fsFilepath)
-    { /* */ }
+{
+  // Maximum possible distance
+  constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
+  m_renderState.clearColor = { minusInfinity, minusInfinity, minusInfinity, 1.0 };
+}
 
 bool ParticlePass::Init()
 {
@@ -40,25 +45,14 @@ void ParticlePass::Render()
   static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
 
   // Save OpenGL state before changing it
-  GLboolean isBlendEnabled;
-  GLboolean isDepthTestEnabled;
-  Vec4 currentClearColor;
+  RenderState previousRenderState = GetCurrentOpenGLRenderState();
 
-  GLCall(glGetBooleanv(GL_BLEND, &isBlendEnabled));
-  GLCall(glGetBooleanv(GL_DEPTH_TEST, &isDepthTestEnabled));
-  GLCall(glGetFloatv(GL_COLOR_CLEAR_VALUE, (float*)(&currentClearColor)));
+  ChangeOpenGLRenderState(m_renderState);
 
   m_framebuffer.Bind();
   m_shader->Bind();
 
   GLCall(glBindVertexArray(m_particlesVAO));
-  // glBindTexture(GL_TEXTURE_2D, m_buffer);
-
-  GLCall(glEnable(GL_DEPTH_TEST));
-
-  // Maximum possible distance
-  constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
-  GLCall(glClearColor(minusInfinity, minusInfinity, minusInfinity, 1.0));
   GLCall(glClear(GL_COLOR_BUFFER_BIT));
   GLCall(glClear(GL_DEPTH_BUFFER_BIT));
   GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
@@ -67,17 +61,8 @@ void ParticlePass::Render()
   m_shader->Unbind();
   m_framebuffer.Unbind();
 
-  if (!isBlendEnabled)
-  {
-    GLCall(glDisable(GL_BLEND));
-  }
-  if (!isDepthTestEnabled)
-  {
-    GLCall(glDisable(GL_DEPTH_TEST));
-  }
-
-  // Restore previous clear color
-  glClearColor(currentClearColor.x, currentClearColor.y, currentClearColor.z, currentClearColor.w);
+  // Restore previous render state
+  ChangeOpenGLRenderState(previousRenderState);
 }
 
 }

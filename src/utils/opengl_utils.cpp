@@ -15,6 +15,7 @@ void PrintCurrentColorFramebuffer(int bufferWidth, int bufferHeight, GLenum form
   {
     // if (i % bufferWidth == 0) std::cout << "\n";
     if (pixels[i] == minusInfinity) continue;
+    if (pixels[i] == 0) continue;
     std::cout << pixels[i] << " ";
   }
   std::cin.get();

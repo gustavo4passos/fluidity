@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <cnpy.h>
 #include "Fluid.hpp"
-#include "Vec.hpp"
 #include "renderer/fluid_renderer.h"
 #include "renderer/window.h"
 #include "utils/logger.h"
@@ -60,6 +59,7 @@ int main(int argc, char* args[])
     Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false);
     fluidity::FluidRenderer* renderer;
 
+    
     if(!window.Init()) 
     {
         LOG_ERROR("Unable to create window..");
