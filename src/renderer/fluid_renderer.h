@@ -8,8 +8,9 @@
 #include "particle_pass.hpp"
 #include "filter_pass.hpp"
 #include "texture_renderer.h"
-#include "../utils/export_directives.h"
-#include "../utils/camera_controller.hpp"
+#include "utils/export_directives.h"
+#include "utils/camera_controller.hpp"
+#include "renderer/texture.hpp"
 #include <unordered_map>
 
 namespace fluidity
@@ -47,6 +48,9 @@ private:
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
+
+  // Debug
+  Texture* m_background;
 
   GLuint m_currentVAO;
 

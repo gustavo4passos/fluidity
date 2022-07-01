@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 namespace fluidity
 {
@@ -28,43 +30,9 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_pointRadius(pointRadius),
   m_filteringEnabled(true),
   m_cameraController(Camera({ 9.66f, 7.73f, 5}, 45.f)),
-  m_nFilterIterations(3) //TODO: Should be configurable
+  m_nFilterIterations(3), //TODO: Should be configurable
+  m_background(nullptr)
   { /* */ }
-
-auto FluidRenderer::Clear() -> void
-{
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
-
-auto FluidRenderer::SetClearColor(float r, float g, float b, float a) -> void
-{
-  glClearColor(r, g, b, a);
-}
-
-auto FluidRenderer::SetVAO(GLuint vao) -> void
-{
-  m_currentVAO = vao;
-
-  for (auto& renderPassPair : m_renderPasses)
-  {
-    renderPassPair.second->SetParticlesVAO(vao);
-  }
-}
-
-auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
-{
-  m_currentNumberOfParticles = n;
-
-  for (auto& renderPassPair : m_renderPasses)
-  {
-    renderPassPair.second->SetNumberOfParticles(n);
-  }
-}
-
-auto FluidRenderer::SetFiltering(bool enabled) -> void
-{
-  m_filteringEnabled = enabled;
-}
 
 auto FluidRenderer::Init() -> bool 
 {
@@ -208,10 +176,6 @@ auto FluidRenderer::Init() -> bool
 
   // Composoition pass -> Init uniforms 
   {
-    auto renderState = m_compositionPass->GetRenderState();
-    renderState.clearColor = { .5f, .5f, .5f, 1.f };
-    m_compositionPass->SetRenderState(renderState);
-
     auto& compositionPassShader = m_compositionPass->GetShader();
     compositionPassShader.Bind();
     compositionPassShader.SetUniform1i("u_HasSolid", 0);
@@ -219,8 +183,9 @@ auto FluidRenderer::Init() -> bool
     compositionPassShader.SetUniform1i("u_DepthTex", 0);
     compositionPassShader.SetUniform1i("u_ThicknessTex", 1);
     compositionPassShader.SetUniform1i("u_NormalTex", 2);
+    compositionPassShader.SetUniform1i("u_BackgroundTex", 3);
     compositionPassShader.SetUniform1i("u_TransparentFluid", 1);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", 75.f);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.4f);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
@@ -230,8 +195,53 @@ auto FluidRenderer::Init() -> bool
   SetUpLights();
   SetUpMaterial();
 
+  int backgroundWidth, backgroundHeight, nChannels;
+  unsigned char* data = stbi_load("../../assets/background.jpg", 
+    &backgroundWidth, &backgroundHeight, &nChannels, 0);
+  
+  if (data == nullptr)
+  {
+    LOG_ERROR("Unable to load background texture.");
+    return false;
+  }
+  m_background = new Texture(data, backgroundWidth, backgroundHeight, nChannels);
   return true;
 }
+auto FluidRenderer::Clear() -> void
+{
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+auto FluidRenderer::SetClearColor(float r, float g, float b, float a) -> void
+{
+  glClearColor(r, g, b, a);
+}
+
+auto FluidRenderer::SetVAO(GLuint vao) -> void
+{
+  m_currentVAO = vao;
+
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    renderPassPair.second->SetParticlesVAO(vao);
+  }
+}
+
+auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
+{
+  m_currentNumberOfParticles = n;
+
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    renderPassPair.second->SetNumberOfParticles(n);
+  }
+}
+
+auto FluidRenderer::SetFiltering(bool enabled) -> void
+{
+  m_filteringEnabled = enabled;
+}
+
 
 auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
 {
@@ -342,7 +352,7 @@ auto FluidRenderer::SetUpMaterial() -> void
 {
   Material material;
   material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
-  material.diffuse   = { 0.2f, 0.2f, 0.7f, 1.f };
+  material.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
   material.specular  = { 1.f, 1.f, 1.f, 1.f };
   material.shininess = 250;
 
@@ -380,6 +390,7 @@ auto FluidRenderer::Render() -> void
   m_compositionPass->SetInputTexture(m_filterPass->GetBuffer(), 0);
   m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(), 1);
   m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 2);
+  m_compositionPass->SetInputTexture(m_background->GetID(), 3);
   m_compositionPass->Render();
 
   m_textureRenderer->SetTexture(
