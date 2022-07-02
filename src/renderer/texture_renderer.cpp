@@ -65,6 +65,7 @@ namespace fluidity
 
     auto TextureRenderer::Render() -> void
     {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_textureShader->Bind();
         GLCall(glActiveTexture(GL_TEXTURE0));
         GLCall(glBindTexture(GL_TEXTURE_2D ,m_currentTexture));

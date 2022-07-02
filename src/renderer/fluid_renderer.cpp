@@ -3,11 +3,12 @@
 #include "utils/opengl_utils.hpp"
 #include "../utils/logger.h"
 #include "../vec.hpp"
+#include "renderer/model.hpp"
 #include <SDL2/SDL.h>
 #include <cmath>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -146,9 +147,7 @@ auto FluidRenderer::Init() -> bool
     thicknessPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius);
     thicknessPassShader.SetUniform1f("u_PointScale", 
       (float)m_windowHeight / std::tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
-    thicknessPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
-    thicknessPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
-    thicknessPassShader.SetUniform1i("u_hasSolid", 0);
+    thicknessPassShader.SetUniform1i("u_HasSolid", 0);
     thicknessPassShader.Unbind();
   }
   
@@ -157,7 +156,7 @@ auto FluidRenderer::Init() -> bool
     auto& narrowFilterShader = m_filterPass->GetShader();
     narrowFilterShader.Bind();
     narrowFilterShader.SetUniform1i("u_DoFilter1D", 0);
-    narrowFilterShader.SetUniform1i("u_FilterSize", 5);
+    narrowFilterShader.SetUniform1i("u_FilterSize", 10);
     narrowFilterShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     narrowFilterShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     narrowFilterShader.SetUniform1i("u_MaxFilterSize", 100);
@@ -185,7 +184,7 @@ auto FluidRenderer::Init() -> bool
     compositionPassShader.SetUniform1i("u_NormalTex", 2);
     compositionPassShader.SetUniform1i("u_BackgroundTex", 3);
     compositionPassShader.SetUniform1i("u_TransparentFluid", 1);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.4f);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.2f);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
@@ -204,17 +203,13 @@ auto FluidRenderer::Init() -> bool
     LOG_ERROR("Unable to load background texture.");
     return false;
   }
-  m_background = new Texture(data, backgroundWidth, backgroundHeight, nChannels);
-  return true;
-}
-auto FluidRenderer::Clear() -> void
-{
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
+  m_background = new Texture(data, backgroundWidth, backgroundHeight, nChannels,
+    TextureFilteringMode::Linear);
 
-auto FluidRenderer::SetClearColor(float r, float g, float b, float a) -> void
-{
-  glClearColor(r, g, b, a);
+  Model m = Model("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
+  m.Load();
+
+  return true;
 }
 
 auto FluidRenderer::SetVAO(GLuint vao) -> void
@@ -271,7 +266,7 @@ auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void
     }
   }
 
-  if (m_nFilterIterations < 1) m_nFilterIterations = 1;
+  if (m_nFilterIterations < 0) m_nFilterIterations = 0;
 }
 
 auto FluidRenderer::InitUniformBuffers() -> bool
@@ -384,10 +379,13 @@ auto FluidRenderer::Render() -> void
     m_filterPass->Render();
   }
 
-  m_normalPass->SetInputTexture(m_filterPass->GetBuffer());
+  const auto& depthTexture = m_nFilterIterations > 0 ? m_filterPass->GetBuffer() : 
+    m_depthPass->GetBuffer();
+
+  m_normalPass->SetInputTexture(depthTexture);
   m_normalPass->Render();
 
-  m_compositionPass->SetInputTexture(m_filterPass->GetBuffer(), 0);
+  m_compositionPass->SetInputTexture(depthTexture, 0);
   m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(), 1);
   m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 2);
   m_compositionPass->SetInputTexture(m_background->GetID(), 3);
@@ -397,8 +395,6 @@ auto FluidRenderer::Render() -> void
       m_filteringEnabled ? m_compositionPass->GetBuffer() : m_thicknessPass->GetBuffer()
   );
 
-
-  Clear();
   m_textureRenderer->Render();
 }
 

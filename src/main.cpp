@@ -59,7 +59,6 @@ int main(int argc, char* args[])
     Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false);
     fluidity::FluidRenderer* renderer;
 
-    
     if(!window.Init()) 
     {
         LOG_ERROR("Unable to create window..");
@@ -71,7 +70,7 @@ int main(int argc, char* args[])
 
     if(!renderer->Init())
     {
-        LOG_ERROR("Unable to initialized fluid surfaces.");
+        LOG_ERROR("Unable to initialize fluid renderer.");
         return 0;
     }
 
@@ -110,9 +109,6 @@ int main(int argc, char* args[])
             }
             renderer->ProcessInput(e);
         }
-
-        renderer->SetClearColor(.3f, .3f, .5f, 1.f);
-        renderer->Clear();
 
         renderer->SetNumberOfParticles(f.GetNumberOfParticles(currentFrame));
         renderer->SetVAO(f.GetFrameVao(currentFrame));

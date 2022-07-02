@@ -23,12 +23,11 @@ public:
   FluidRenderer(const FluidRenderer&) = delete;
 
   auto Init()  -> bool;
-  auto Clear() -> void;
   auto SetVAO(GLuint vao) -> void;
   auto SetNumberOfParticles(unsigned n) -> void;
+
   auto Update() -> void override;
   auto Render() -> void override;
-  auto SetClearColor(float r, float g, float b, float a) -> void;
 
   auto SetFiltering(bool enabled) -> void;
   auto GetFiltering() -> bool { return m_filteringEnabled; }
@@ -40,6 +39,8 @@ private:
   auto SetUpMaterial()      -> void; 
   auto UploadCameraData()   -> void;
 
+  GLuint m_currentVAO;
+
   // Render passes
   TextureRenderer*    m_textureRenderer;
   ParticleRenderPass* m_particleRenderPass;
@@ -49,10 +50,7 @@ private:
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
 
-  // Debug
-  Texture* m_background;
-
-  GLuint m_currentVAO;
+  CameraController m_cameraController;
 
   // Useful for performing operations that affect every render pass
   std::unordered_map<std::string, RenderPass*> m_renderPasses;
@@ -73,6 +71,8 @@ private:
 
   bool m_filteringEnabled;
 
-  CameraController m_cameraController;
+
+  // Debug
+  Texture* m_background;
 };
 }

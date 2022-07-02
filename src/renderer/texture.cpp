@@ -52,7 +52,6 @@ void Texture::SetFilteringMode(TextureFilteringMode mode)
 
 void Texture::SetTexFiltering(TextureFilteringMode magLinearFiltering, TextureFilteringMode minLinearFiltering) {
     Bind();
-    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magLinearFiltering == TextureFilteringMode::Linear ? GL_LINEAR : GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minLinearFiltering == TextureFilteringMode::Linear ? GL_LINEAR : GL_NEAREST);
 }
