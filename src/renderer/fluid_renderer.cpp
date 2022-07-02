@@ -3,7 +3,6 @@
 #include "utils/opengl_utils.hpp"
 #include "../utils/logger.h"
 #include "../vec.hpp"
-#include "renderer/model.hpp"
 #include <SDL2/SDL.h>
 #include <cmath>
 #include <glm/glm.hpp>
@@ -32,7 +31,10 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_filteringEnabled(true),
   m_cameraController(Camera({ 9.66f, 7.73f, 5}, 45.f)),
   m_nFilterIterations(3), //TODO: Should be configurable
-  m_background(nullptr)
+  m_background(nullptr),
+  m_meshesBuffer({ { { GL_RGB32F, GL_RGB, GL_FLOAT } }, (int)windowWidth, (int)windowHeight, true }),
+  m_meshesShader(nullptr),
+  m("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj")
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -206,8 +208,10 @@ auto FluidRenderer::Init() -> bool
   m_background = new Texture(data, backgroundWidth, backgroundHeight, nChannels,
     TextureFilteringMode::Linear);
 
-  Model m = Model("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
   m.Load();
+
+  m_meshesBuffer.Init();
+  m_meshesShader = new Shader("../../shaders/mesh.vert", "../../shaders/mesh.frag");
 
   return true;
 }
@@ -371,6 +375,26 @@ auto FluidRenderer::Render() -> void
   // m_thicknessPass->GetFramebuffer().Bind();
   // PrintCurrentColorFramebuffer(m_windowWidth, m_windowHeight, GL_R32F, GL_FLOAT);
   // m_thicknessPass->GetFramebuffer().Unbind();
+  
+  // Debug: Render meshes
+  m_meshesBuffer.Bind();
+  glClearColor(234.f / 255.f, 221.f / 255.f, 202.f / 255.f, 1.f);
+  GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+  m_meshesShader->Bind();
+  auto& projection = m_cameraController.GetCamera().GetProjectionMatrix();
+  auto& view = m_cameraController.GetCamera().GetViewMatrix();
+
+  m_meshesShader->SetUniformMat4("projection", glm::value_ptr(projection));
+  m_meshesShader->SetUniformMat4("view", glm::value_ptr(view));
+  glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+  GLCall(glBindVertexArray(m.GetMeshes()[0].GetVao()));
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.GetMeshes()[0].GetIbo());
+  GLCall(glDrawElements(GL_TRIANGLES, m.GetMeshes()[0].GetIndices().size(), GL_UNSIGNED_INT, (const void*)0)); 
+  glBindVertexArray(m.GetMeshes()[0].GetVao());
+  glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+
+  m_meshesBuffer.Unbind();
+  m_meshesShader->Unbind();
 
   for (int i = 0; i < m_nFilterIterations; i++)
   {
@@ -388,11 +412,11 @@ auto FluidRenderer::Render() -> void
   m_compositionPass->SetInputTexture(depthTexture, 0);
   m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(), 1);
   m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 2);
-  m_compositionPass->SetInputTexture(m_background->GetID(), 3);
+  m_compositionPass->SetInputTexture(m_meshesBuffer.GetAttachment(0), 3);
   m_compositionPass->Render();
 
   m_textureRenderer->SetTexture(
-      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_thicknessPass->GetBuffer()
+      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_meshesBuffer.GetAttachment(0)
   );
 
   m_textureRenderer->Render();

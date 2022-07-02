@@ -25,15 +25,15 @@ bool Model::Load()
     {
         auto* assimpMesh = scene->mMeshes[i];
         std::vector<vec3> vertices;
-        std::vector<unsigned> indices;
+        std::vector<unsigned int> indices;
         vertices.resize(assimpMesh->mNumVertices);
 
         for (int j = 0; j < assimpMesh->mNumVertices; j++)
         {
             const auto& vertex = assimpMesh->mVertices[j];
-            vertices[0].x = vertex.x;
-            vertices[0].y = vertex.y;
-            vertices[0].z = vertex.z;
+            vertices[j].x = vertex.x;
+            vertices[j].y = vertex.y;
+            vertices[j].z = vertex.z;
         }
 
         for (int j = 0; j < assimpMesh->mNumFaces; j++)

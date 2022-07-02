@@ -1,31 +1,33 @@
 #include "renderer/mesh.hpp"
+#include "utils/glcall.h"
 #include <iostream>
 
-Mesh::Mesh(const std::vector<vec3>& vertices, const std::vector<unsigned>& indices)
+Mesh::Mesh(const std::vector<vec3>& vertices, const std::vector<unsigned int>& indices)
     : m_vertices(vertices),
     m_indices(indices)
 { /* */  }
     
 bool Mesh::Init()
 {
-    glGenBuffers(1, &m_vbo);
-    glGenBuffers(1, &m_ibo);
-    glGenVertexArrays(1, &m_vao);
+    GLCall(glGenVertexArrays(1, &m_vao));
+    GLCall(glGenBuffers(1, &m_vbo));
+    GLCall(glGenBuffers(1, &m_ibo));
 
-    glBindVertexArray(m_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * m_vertices.size(), 
-        &m_vertices[0], GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(unsigned), 
-        &m_indices[0], GL_STATIC_DRAW);
+    GLCall(glBindVertexArray(m_vao));
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, m_vbo));
+    GLCall(glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * m_vertices.size(), 
+        &m_vertices[0], GL_STATIC_DRAW));
     
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo));
+    GLCall(glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indices.size() * sizeof(unsigned int), 
+        &m_indices[0], GL_STATIC_DRAW));
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    GLCall(glEnableVertexAttribArray(0));
+    GLCall(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vec3), (void*)0));
+
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+    GLCall(glBindVertexArray(0));
 
     return true;
 }

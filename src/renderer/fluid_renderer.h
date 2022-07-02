@@ -11,6 +11,7 @@
 #include "utils/export_directives.h"
 #include "utils/camera_controller.hpp"
 #include "renderer/texture.hpp"
+#include "renderer/model.hpp"
 #include <unordered_map>
 
 namespace fluidity
@@ -74,5 +75,8 @@ private:
 
   // Debug
   Texture* m_background;
+  Framebuffer m_meshesBuffer;
+  Shader* m_meshesShader;
+  Model m;
 };
 }

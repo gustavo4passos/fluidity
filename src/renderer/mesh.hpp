@@ -7,7 +7,7 @@ class Mesh
 {
 public: 
     Mesh(const std::vector<vec3>& vertices, 
-        const std::vector<unsigned>& indices);
+        const std::vector<unsigned int>& indices);
 
     // Requires an active OpenGL context
     bool Init();
@@ -16,11 +16,11 @@ public:
     GLuint GetIbo() { return m_ibo; }
 
     std::vector<vec3>& GetVertices()     { return m_vertices; }
-    std::vector<unsigned>& GetIndices()  { return m_indices;  }
+    std::vector<unsigned int>& GetIndices()  { return m_indices;  }
 
 private:
     std::vector<vec3> m_vertices;
-    std::vector<unsigned> m_indices;
+    std::vector<unsigned int> m_indices;
 
     GLuint m_vao;
     GLuint m_vbo;
