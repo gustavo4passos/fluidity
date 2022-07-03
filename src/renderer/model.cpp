@@ -24,16 +24,26 @@ bool Model::Load()
     for (int i = 0; i < scene->mNumMeshes; i++)
     {
         auto* assimpMesh = scene->mMeshes[i];
-        std::vector<vec3> vertices;
+        std::vector<Vertex> vertices;
         std::vector<unsigned int> indices;
         vertices.resize(assimpMesh->mNumVertices);
 
         for (int j = 0; j < assimpMesh->mNumVertices; j++)
         {
             const auto& vertex = assimpMesh->mVertices[j];
-            vertices[j].x = vertex.x;
-            vertices[j].y = vertex.y;
-            vertices[j].z = vertex.z;
+            vertices[j].position.x = vertex.x;
+            vertices[j].position.y = vertex.y;
+            vertices[j].position.z = vertex.z;
+
+            // Same thing as calling HasNormals(), just avoid checking if mNumVertices > 0,
+            // since if we are here, we already know it is.
+            if (assimpMesh->mNormals != nullptr)
+            {
+                const auto& normal = assimpMesh->mNormals[j];
+                vertices[j].normal.x = normal.x;
+                vertices[j].normal.y = normal.y;
+                vertices[j].normal.z = normal.z;
+            }
         }
 
         for (int j = 0; j < assimpMesh->mNumFaces; j++)

@@ -70,6 +70,8 @@ void Framebuffer::InitAttachment(const FramebufferAttachment& attachment)
     GLCall(glBindTexture(GL_TEXTURE_2D, texture));
     GLCall(glTexImage2D(GL_TEXTURE_2D, 0, attachment.internalFormat, m_specification.width, 
           m_specification.height, 0, attachment.pixelFormat, attachment.dataType, nullptr));
+    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP));
+    GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
     GLCall(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
     GLCall(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + currentAttachmentIndex,

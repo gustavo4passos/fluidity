@@ -186,7 +186,7 @@ auto FluidRenderer::Init() -> bool
     compositionPassShader.SetUniform1i("u_NormalTex", 2);
     compositionPassShader.SetUniform1i("u_BackgroundTex", 3);
     compositionPassShader.SetUniform1i("u_TransparentFluid", 1);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.2f);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.1f);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
@@ -386,7 +386,7 @@ auto FluidRenderer::Render() -> void
 
   m_meshesShader->SetUniformMat4("projection", glm::value_ptr(projection));
   m_meshesShader->SetUniformMat4("view", glm::value_ptr(view));
-  glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+  // glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
   GLCall(glBindVertexArray(m.GetMeshes()[0].GetVao()));
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.GetMeshes()[0].GetIbo());
   GLCall(glDrawElements(GL_TRIANGLES, m.GetMeshes()[0].GetIndices().size(), GL_UNSIGNED_INT, (const void*)0)); 
