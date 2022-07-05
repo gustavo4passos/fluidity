@@ -13,7 +13,6 @@ public:
       int bufferWidth,
       int bufferHeight,
       int numberOfParticles,
-      const float pointRadius,
       GLuint particlesVAO,
       FramebufferAttachment renderTargetSpecification,
       const std::string& vsFilepath,
@@ -22,7 +21,6 @@ public:
 
     virtual bool Init() override;
     virtual void Render() override;
-
 
 private:
     FramebufferAttachment m_renderTargetSpecification;

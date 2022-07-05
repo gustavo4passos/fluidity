@@ -12,11 +12,10 @@ public:
     FilterPass(
       int bufferWidth,
       int bufferHeight,
-      const float pointRadius,
       const FramebufferAttachment& renderTargetSpecification,
       const std::string& fsFilePath,
       const bool useDoubleBuffer = false
-    );
+);
 
     virtual bool Init() override;
     virtual void Render() override;

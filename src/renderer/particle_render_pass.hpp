@@ -21,9 +21,11 @@ public:
 
     virtual bool Init() override;
     virtual void Render() override;
+
 private:
     bool SetUniforms() override;
-
+    float m_pointRadius;
+    
     enum ColorMode 
     {
       COLOR_MODE_UNIFORM_MATERIAL = 0,

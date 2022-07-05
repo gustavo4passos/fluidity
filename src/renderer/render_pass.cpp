@@ -7,14 +7,12 @@ namespace fluidity
 RenderPass::RenderPass(
   int bufferWidth,
   int bufferHeight,
-  int numberOfParticles,
-  const float pointRadius,
-  GLuint particlesVAO)
+  int numVertices,
+  GLuint vao)
   : m_bufferWidth(bufferWidth),
   m_bufferHeight(bufferHeight),
-  m_numberOfParticles(numberOfParticles),
-  m_pointRadius(pointRadius),
-  m_particlesVAO(particlesVAO),
+  m_numVertices(numVertices),
+  m_vao(vao),
   m_framebuffer({ {}, bufferWidth, bufferHeight }),
   m_renderState({})
 { /* */ } 

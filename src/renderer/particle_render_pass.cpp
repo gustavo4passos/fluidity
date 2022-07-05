@@ -12,7 +12,8 @@ ParticleRenderPass::ParticleRenderPass(
     const unsigned numberOfParticles,
     const float pointRadius,
     GLuint particlesVAO)
-    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO)
+    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, particlesVAO),
+    m_pointRadius(pointRadius)
     { /* */ }
 
     bool ParticleRenderPass::Init()
@@ -38,22 +39,22 @@ ParticleRenderPass::ParticleRenderPass(
 
         ChangeOpenGLRenderState(m_renderState);
 
-        GLCall(glBindVertexArray(m_particlesVAO));
+        GLCall(glBindVertexArray(m_vao));
         GLCall(glClear(GL_COLOR_BUFFER_BIT));
         GLCall(glClear(GL_DEPTH_BUFFER_BIT));
-        GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
+        GLCall(glDrawArrays(GL_POINTS, 0, m_numVertices));
 
         GLCall(glBindVertexArray(0));
         m_shader->Unbind();
         m_framebuffer.Unbind();
 
-        ChangeOpenGLRenderState(m_renderState);
+        // ChangeOpenGLRenderState(previousRenderState);
     }
 
     bool ParticleRenderPass::SetUniforms()
     {
       m_shader->Bind();
-      m_shader->SetUniform1ui("u_nParticles", m_numberOfParticles);
+      m_shader->SetUniform1ui("u_nParticles", m_numVertices);
       m_shader->SetUniform1i("u_ColorMode", COLOR_MODE_RANDOM);
       m_shader->SetUniform1i("u_UseAnisotropyKernel", 0);
       m_shader->SetUniform1f("u_PointRadius", (float)m_pointRadius);

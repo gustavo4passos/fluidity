@@ -86,7 +86,8 @@ void Framebuffer::AttachDepthBuffer()
   GLCall(glBindRenderbuffer(GL_RENDERBUFFER, m_depthAttachment));
   GLCall(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 
         m_specification.width, m_specification.height));
-  GLCall(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_depthAttachment));
+  GLCall(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 
+    m_depthAttachment));
   GLCall(glBindRenderbuffer(GL_RENDERBUFFER, 0));
 }
 

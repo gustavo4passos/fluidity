@@ -9,12 +9,16 @@ Model::Model(const std::string& filePath)
     : m_filePath(filePath)
 { /* */ }
 
-bool Model::Load()
+bool Model::Load(bool genSmoothNormals)
 {
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(m_filePath, aiProcess_Triangulate | 
-        aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
+    if (genSmoothNormals) importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, 
+        aiComponent_NORMALS);
 
+    const aiScene* scene = importer.ReadFile(m_filePath, aiProcess_Triangulate | aiProcess_FlipUVs | 
+        (genSmoothNormals ? (aiProcess_RemoveComponent | aiProcess_GenSmoothNormals) : 0) |
+        aiProcess_CalcTangentSpace);
+    
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
         LOG_ERROR("Unable to load model: [" + m_filePath + "] " + std::string(importer.GetErrorString()));

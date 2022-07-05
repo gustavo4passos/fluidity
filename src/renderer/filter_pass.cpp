@@ -8,12 +8,11 @@ namespace fluidity
 FilterPass::FilterPass(
     int bufferWidth,
     int bufferHeight,
-    const float pointRadius,
     const FramebufferAttachment& renderTargetSpecification,
     const std::string& fsFilePath,
     const bool useDoubleBuffer
     )
-    : RenderPass(bufferWidth, bufferHeight, 0, pointRadius, 0),
+    : RenderPass(bufferWidth, bufferHeight, 0, 0),
     m_fsFilePath(fsFilePath),
     m_renderTargetSpecification(renderTargetSpecification),
     m_useDoubleBuffer(useDoubleBuffer)

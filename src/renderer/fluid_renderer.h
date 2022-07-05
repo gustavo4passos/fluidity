@@ -4,9 +4,10 @@
 #include "shader.h"
 #include "fluid_surfaces_renderer.h"
 #include "surface_smoothing_pass.h"
-#include "particle_render_pass.hpp"
-#include "particle_pass.hpp"
-#include "filter_pass.hpp"
+#include "renderer/particle_render_pass.hpp"
+#include "renderer/particle_pass.hpp"
+#include "renderer/filter_pass.hpp"
+#include "renderer/meshes_pass.hpp"
 #include "texture_renderer.h"
 #include "utils/export_directives.h"
 #include "utils/camera_controller.hpp"
@@ -39,6 +40,7 @@ private:
   auto SetUpLights()        -> void;
   auto SetUpMaterial()      -> void; 
   auto UploadCameraData()   -> void;
+  auto UploadLights()       -> void;
 
   GLuint m_currentVAO;
 
@@ -50,11 +52,13 @@ private:
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
+  MeshesPass*         m_meshesPass;
 
   CameraController m_cameraController;
 
   // Useful for performing operations that affect every render pass
   std::unordered_map<std::string, RenderPass*> m_renderPasses;
+  std::vector<PointLight> m_lights;
   
   GLuint m_uniformBufferCameraData;
   GLuint m_uniformBufferLights;
@@ -71,12 +75,9 @@ private:
   float m_pointRadius;
 
   bool m_filteringEnabled;
-
+  int m_transparentFluid;
 
   // Debug
   Texture* m_background;
-  Framebuffer m_meshesBuffer;
-  Shader* m_meshesShader;
-  Model m;
 };
 }

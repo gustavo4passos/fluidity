@@ -6,7 +6,7 @@ class Model
 {
 public:
     Model(const std::string& filePath);
-    bool Load();
+    bool Load(bool genSmoothNormals = false);
 
     std::vector<Mesh>& GetMeshes() { return m_meshes; }
 

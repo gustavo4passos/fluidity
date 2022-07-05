@@ -12,12 +12,11 @@ ParticlePass::ParticlePass(
     int bufferWidth,
     int bufferHeight,
     int numberOfParticles,
-    const float pointRadius,
     GLuint particlesVAO,
     FramebufferAttachment renderTargetSpecification,
     const std::string& vsFilepath,
     const std::string& fsFilepath)
-    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, pointRadius, particlesVAO),
+    : RenderPass(bufferWidth, bufferHeight, numberOfParticles, particlesVAO),
       m_renderTargetSpecification(renderTargetSpecification),
       m_vsFilePath(vsFilepath),
       m_fsFilePath(fsFilepath)
@@ -42,7 +41,6 @@ bool ParticlePass::Init()
 void ParticlePass::Render()
 {
   assert(m_shader != nullptr);
-  static_assert(std::numeric_limits<float>::is_iec559, "IEEE 754 required");
 
   // Save OpenGL state before changing it
   RenderState previousRenderState = GetCurrentOpenGLRenderState();
@@ -52,10 +50,10 @@ void ParticlePass::Render()
   m_framebuffer.Bind();
   m_shader->Bind();
 
-  GLCall(glBindVertexArray(m_particlesVAO));
+  GLCall(glBindVertexArray(m_vao));
   GLCall(glClear(GL_COLOR_BUFFER_BIT));
-  GLCall(glClear(GL_DEPTH_BUFFER_BIT));
-  GLCall(glDrawArrays(GL_POINTS, 0, m_numberOfParticles));
+  if (m_renderState.useDepthTest) GLCall(glClear(GL_DEPTH_BUFFER_BIT));
+  GLCall(glDrawArrays(GL_POINTS, 0, m_numVertices));
 
   GLCall(glBindVertexArray(0));
   m_shader->Unbind();
