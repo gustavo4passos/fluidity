@@ -36,11 +36,13 @@ public:
   auto ProcessInput(const SDL_Event& event) -> void;
 
 private:
-  auto InitUniformBuffers() -> bool;
-  auto SetUpLights()        -> void;
-  auto SetUpMaterial()      -> void; 
-  auto UploadCameraData()   -> void;
-  auto UploadLights()       -> void;
+  bool InitUniformBuffers();
+  void UploadCameraData();
+  void UploadLights();
+  void SetUpLights();
+  void SetUpMaterial(); 
+  void SetUpStaticUniforms();
+  void SetUpPerFrameUniforms();
 
   GLuint m_currentVAO;
 
@@ -53,6 +55,7 @@ private:
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
   MeshesPass*         m_meshesPass;
+  MeshesPass*         m_meshesShadowPass;
 
   CameraController m_cameraController;
 
@@ -75,9 +78,7 @@ private:
   float m_pointRadius;
 
   bool m_filteringEnabled;
+  bool m_renderShadows;
   int m_transparentFluid;
-
-  // Debug
-  Texture* m_background;
 };
 }

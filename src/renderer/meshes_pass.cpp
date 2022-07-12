@@ -8,17 +8,21 @@ namespace fluidity
 
 MeshesPass::MeshesPass(int bufferWidth,
     int bufferHeight,
+    const std::string& vsFilePath,
+    const std::string& fsFilePath,
+    const std::vector<FramebufferAttachment> attachments,
     const std::vector<Model>& models)
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
-    m_models(models)
-{ /* */ }
+    m_models(models),
+    m_vsFilePath(vsFilePath),
+    m_fsFilePath(fsFilePath)
+{
+    for (const auto& attachment : attachments) m_framebuffer.PushAttachment(attachment);
+}
 
 bool MeshesPass::Init()
 {
-    m_shader = new Shader("../../shaders/mesh.vert", "../../shaders/mesh.frag");
-    m_framebuffer.PushAttachment({ GL_RGB32F, GL_RGB, GL_FLOAT });
-    m_framebuffer.PushAttachment({ GL_R32F,   GL_RED, GL_FLOAT });
-
+    m_shader = new Shader(m_vsFilePath, m_fsFilePath);
     return RenderPass::Init();
 }
 
@@ -31,12 +35,12 @@ void MeshesPass::Render()
 
     m_framebuffer.Bind();
     m_shader->Bind();
-
     ChangeOpenGLRenderState(m_renderState);
+    BindTextures();
 
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     float minusInfinity = -1000000.f;
-    glClearBufferfv(GL_COLOR, 1, &minusInfinity);
+    GLCall(glClearBufferfv(GL_COLOR, 1, &minusInfinity));
 
     for (auto& model : m_models)
     {
@@ -64,7 +68,7 @@ void MeshesPass::Render()
     // std::cout << "\n\n\n";
     // std::cin.get();
     // std::cin.ignore();
-
+    UnbindTextures();
     GLCall(glBindVertexArray(0));
     m_shader->Unbind();
     m_framebuffer.Unbind();

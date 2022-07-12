@@ -1,7 +1,6 @@
 #pragma once
 #include "render_pass.hpp"
 #include <string>
-#include <unordered_map>
 
 namespace fluidity
 {
@@ -19,7 +18,6 @@ public:
 
     virtual bool Init() override;
     virtual void Render() override;
-    virtual void SetInputTexture(GLuint texture, int slot = 0);
 
     // Require double buffering
     // Set current render target as the input texture AND swap framebuffer render targets (0 and 1)
@@ -27,8 +25,6 @@ public:
 
 protected:
     void InitQuadVao();
-    void BindTextures();
-    void UnbindTextures();
 
     std::string m_fsFilePath;
     FramebufferAttachment m_renderTargetSpecification;
@@ -36,8 +32,6 @@ protected:
 
     GLuint m_quadVao;
     GLuint m_quadVbo;
-
-    std::unordered_map<int, GLuint> m_textureBinds;
 };
 
 }

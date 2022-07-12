@@ -2,6 +2,7 @@
 #include "framebuffer.hpp"
 #include "shader.h"
 #include "vec.hpp"
+#include <unordered_map>
 
 namespace fluidity
 {
@@ -40,6 +41,10 @@ public:
   virtual void SetRenderState(const RenderState& state) { m_renderState = state; };
   virtual RenderState& GetRenderState() { return m_renderState; } 
 
+  virtual void SetInputTexture(GLuint texture, int slot = 0);
+  void BindTextures();
+  void UnbindTextures();
+
 protected:
   virtual void ChangeOpenGLRenderState(const RenderState& state);
   virtual RenderState GetCurrentOpenGLRenderState();
@@ -53,6 +58,9 @@ protected:
   GLuint m_vao;
   Framebuffer m_framebuffer;
   RenderState m_renderState;
+
+  std::unordered_map<int, GLuint> m_textureBinds;
+
 };
 
 }

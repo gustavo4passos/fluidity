@@ -58,10 +58,36 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "fstream": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "*.idl": "cpp",
+        "any": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "charconv": "cpp",
+        "chrono": "cpp",
+        "cinttypes": "cpp",
+        "codecvt": "cpp",
+        "cstdarg": "cpp",
+        "deque": "cpp",
+        "format": "cpp",
+        "forward_list": "cpp",
+        "functional": "cpp",
+        "list": "cpp",
+        "mutex": "cpp",
+        "optional": "cpp",
+        "queue": "cpp",
+        "random": "cpp",
+        "ratio": "cpp",
+        "stack": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "variant": "cpp",
+        "xhash": "cpp"
     },
     "cmake.debugConfig": {
-        "args": ["C:\\dev\\npy_reading\\frame51to110", "110"]
+        "args": ["C:\\dev\\FluidSimulationFiles\\Canyon\\DeepFluids", "200"]
     },
     "cmake.configureOnOpen": false
 }

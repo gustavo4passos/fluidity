@@ -31,8 +31,8 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_filteringEnabled(true),
   m_cameraController(Camera({ 9.66f, 7.73f, 5 }, 45.f)),
   m_transparentFluid(true),
-  m_nFilterIterations(3), //TODO: Should be configurable
-  m_background(nullptr)
+  m_renderShadows(true),
+  m_nFilterIterations(3) //TODO: Should be configurable
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -93,7 +93,23 @@ auto FluidRenderer::Init() -> bool
 
   m_meshesPass = new MeshesPass(
     m_windowWidth,
-    m_windowHeight
+    m_windowHeight,
+    "../../shaders/mesh.vert", 
+    "../../shaders/mesh.frag",
+    { 
+      { GL_RGB32F, GL_RGB, GL_FLOAT },
+      { GL_R32F,   GL_RED, GL_FLOAT }
+    }
+  );
+
+  m_meshesShadowPass = new MeshesPass(
+    m_windowWidth,
+    m_windowHeight,
+    "../../shaders/mesh-shadow.vert",
+    "../../shaders/mesh-shadow.frag",
+    {
+      { GL_R32F, GL_RED, GL_FLOAT }
+    }
   );
 
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
@@ -103,6 +119,7 @@ auto FluidRenderer::Init() -> bool
   m_renderPasses["CompositionPass"]    = m_compositionPass;
   m_renderPasses["ThicknessPass"]      = m_thicknessPass;
   m_renderPasses["MeshesPass"]         = m_meshesPass;
+  m_renderPasses["MeshesShadowPass"]   = m_meshesShadowPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -119,6 +136,215 @@ auto FluidRenderer::Init() -> bool
     return false;  
   }
 
+  SetUpStaticUniforms();
+
+  // Meshes pass -> Setup
+  {
+    auto& meshesRenderState = m_meshesPass->GetRenderState();
+    meshesRenderState.clearColor = { 234.f / 255.f, 221.f / 255.f, 202.f / 255.f, 1.f };
+    Model m("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
+    m.Load(true); // Smooth normals
+    m_meshesPass->AddModel(m);
+    m_meshesShadowPass->AddModel(m);
+
+    auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
+    meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
+  }
+
+  if (!InitUniformBuffers()) return false;
+
+  SetUpLights();
+  SetUpMaterial();
+
+  return true;
+}
+
+auto FluidRenderer::SetVAO(GLuint vao) -> void
+{
+  m_currentVAO = vao;
+
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    renderPassPair.second->SetVAO(vao);
+  }
+}
+
+auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
+{
+  m_currentNumberOfParticles = n;
+
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    renderPassPair.second->SetNumVertices(n);
+  }
+}
+
+auto FluidRenderer::SetFiltering(bool enabled) -> void
+{
+  m_filteringEnabled = enabled;
+}
+
+auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
+{
+  m_cameraController.ProcessInput(e);
+
+  if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f)
+  {
+    SetFiltering(!m_filteringEnabled);
+  }
+
+  if (e.type == SDL_KEYUP)
+  {
+    switch (e.key.keysym.sym)
+    {
+      // Filter iterations
+      case (SDLK_UP):
+      {
+        m_nFilterIterations++;
+        break;
+      } 
+
+      case (SDLK_DOWN):
+      {
+        m_nFilterIterations--;
+        break;
+      }
+
+      case (SDLK_t):
+      {
+        m_transparentFluid = !m_transparentFluid;
+        auto& compositionPassShader = m_compositionPass->GetShader();
+        compositionPassShader.Bind();
+        compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
+        compositionPassShader.Unbind();
+        break;
+      }
+
+      // Render shadows
+      case (SDLK_r):
+      {
+        m_renderShadows = !m_renderShadows;
+        break;
+      }
+
+      // Light control
+      case SDLK_j:
+      {
+        m_lights[0].position.x -= 2.f;
+        break;
+      }
+      case SDLK_l:
+      {
+        m_lights[0].position.x += 2.f;
+        break;
+      }
+      case SDLK_i:
+      {
+        m_lights[0].position.y += 2.f;
+        break;
+      }
+      case SDLK_k:
+      {
+        m_lights[0].position.y -= 2.f;
+        break;
+      }
+
+      case SDLK_y:
+      {
+        m_lights[0].position.z += 2.f;
+        break;
+      }
+
+      case SDLK_h:
+      {
+        m_lights[0].position.z -= 2.f;
+        break;
+      }
+
+      default: break;
+    }
+  }
+
+  if (m_nFilterIterations < 0) m_nFilterIterations = 0;
+}
+
+auto FluidRenderer::InitUniformBuffers() -> bool
+{
+  // Init uniform buffers data
+  GLCall(glGenBuffers(1, &m_uniformBufferCameraData));
+  GLCall(glGenBuffers(1, &m_uniformBufferLights));
+  GLCall(glGenBuffers(1, &m_uniformBufferMaterial));
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
+  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraData), nullptr, GL_DYNAMIC_DRAW));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 0, m_uniformBufferCameraData, 0, sizeof(CameraData)));
+
+  // Size of Lights is the total number of lights + an int that stores the number of lights in the scene
+  constexpr int LIGHTS_UB_SIZE = sizeof(PointLight) * NUM_TOTAL_LIGHTS + sizeof(int);
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
+  GLCall(glBufferData(GL_UNIFORM_BUFFER, LIGHTS_UB_SIZE, nullptr, GL_STATIC_DRAW));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 1, m_uniformBufferLights, 0, LIGHTS_UB_SIZE));
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
+  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(Material), nullptr, GL_STATIC_DRAW));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 2, m_uniformBufferMaterial, 0, sizeof(Material)));
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+
+  // Setup uniform buffers on render passes
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    if (!renderPassPair.second->SetUniformBuffer("CameraData", 0))
+    {
+      LOG_ERROR("Unable to set CameraData uniform buffer on " + renderPassPair.first);
+    }
+
+    if (!renderPassPair.second->SetUniformBuffer("Lights", 1))
+    {
+      LOG_ERROR("Unable to set Lights uniform buffer on " + renderPassPair.first);
+    }
+    if (!renderPassPair.second->SetUniformBuffer("Material", 2))
+    {
+      LOG_ERROR("Unable to set Material uniform buffer on " + renderPassPair.first);
+    }
+  }
+
+  return true;
+}
+
+auto FluidRenderer::SetUpLights() -> void
+{
+  PointLight light;
+  light.ambient  = { .2f, .2f, .2f, .2f };
+  light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
+  light.specular = { 1.f, 1.f, 1.f, 1.f };
+
+  light.position = { -10, 12.f, -4.f, 1.f };
+
+  m_lights.push_back(light);
+
+  PointLight light2;
+  light2.ambient  = { .1f, .1f, .1f, 1.f };
+  light2.diffuse  = { .3f, .3f, .3f, 1.f };
+  light2.specular = { 1.f, 1.f, 1.f, 1.f };
+  light2.position = { 10, -20.f, -10.f, 1.f };
+}
+
+auto FluidRenderer::SetUpMaterial() -> void
+{
+  Material material;
+  material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
+  material.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
+  material.specular  = { .7f, .7f, .7f, 1.f };
+  material.shininess = 250;
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
+  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material));
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+}
+
+auto FluidRenderer::SetUpStaticUniforms() -> void
+{
   // TODO: Maybe these passes should be serialized, or initialized in another class?
   // Depth pass -> Init uniforms
   {
@@ -185,204 +411,45 @@ auto FluidRenderer::Init() -> bool
     compositionPassShader.SetUniform1i("u_BackgroundTex", 3);
     compositionPassShader.SetUniform1i("u_SolidDepthMap", 4);
     compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.35f);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.25f);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
-
-  // Meshes pass -> Setup
-  {
-    auto& meshesRenderState = m_meshesPass->GetRenderState();
-    meshesRenderState.clearColor = { 234.f / 255.f, 221.f / 255.f, 202.f / 255.f, 1.f };
-    Model m("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
-    m.Load(true);
-    m_meshesPass->AddModel(m);
-  }
-
-  if (!InitUniformBuffers()) return false;
-
-  SetUpLights();
-  SetUpMaterial();
-
-  int backgroundWidth, backgroundHeight, nChannels;
-  unsigned char* data = stbi_load("../../assets/background.jpg", 
-    &backgroundWidth, &backgroundHeight, &nChannels, 0);
-  
-  if (data == nullptr)
-  {
-    LOG_ERROR("Unable to load background texture.");
-    return false;
-  }
-
-  m_background = new Texture(data, backgroundWidth, backgroundHeight, nChannels,
-    TextureFilteringMode::Linear);
-
-
-  return true;
 }
 
-auto FluidRenderer::SetVAO(GLuint vao) -> void
+void FluidRenderer::SetUpPerFrameUniforms()
 {
-  m_currentVAO = vao;
-
-  for (auto& renderPassPair : m_renderPasses)
+  // Meshes shadow pass
+  // TODO: This can be done in one pass using the messes pass? Possibly
+  // using alpha blending to generate depth
   {
-    renderPassPair.second->SetVAO(vao);
+    // If there are no lights, there's nothing to do here
+    if (m_lights.size() == 0) return;
+
+    // TODO: For now only one light is being used. How to handle multiple lights?
+    auto& light1 = m_lights[0];
+    // Find light matrix
+    float radius = 10.f;
+    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
+    glm::mat4 lightView = glm::lookAt(glm::vec3(light1.position.x, light1.position.y, light1.position.z),
+      glm::vec3(0), // directional light, pointing at scene origin
+      glm::vec3(0, 1.0, 0));
+    
+    glm::mat4 lightMatrix = lightProjection * lightView;
+
+    auto& meshesShadowShader = m_meshesShadowPass->GetShader();
+    meshesShadowShader.Bind();
+    meshesShadowShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
+    meshesShadowShader.Unbind();
+
+    auto& meshesShader = m_meshesPass->GetShader();
+    meshesShader.Bind();
+    meshesShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
+    meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
+    meshesShader.Unbind();
   }
 }
 
-auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
-{
-  m_currentNumberOfParticles = n;
-
-  for (auto& renderPassPair : m_renderPasses)
-  {
-    renderPassPair.second->SetNumVertices(n);
-  }
-}
-
-auto FluidRenderer::SetFiltering(bool enabled) -> void
-{
-  m_filteringEnabled = enabled;
-}
-
-
-auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
-{
-  m_cameraController.ProcessInput(e);
-
-  if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f)
-  {
-    SetFiltering(!m_filteringEnabled);
-  }
-
-  if (e.type == SDL_KEYUP)
-  {
-    switch (e.key.keysym.sym)
-    {
-      case (SDLK_UP):
-      {
-        m_nFilterIterations++;
-        break;
-      } 
-      case (SDLK_t):
-      {
-        m_transparentFluid = !m_transparentFluid;
-        auto& compositionPassShader = m_compositionPass->GetShader();
-        compositionPassShader.Bind();
-        compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-        compositionPassShader.Unbind();
-        break;
-      }
-
-      case (SDLK_DOWN):
-      {
-        m_nFilterIterations--;
-        break;
-      }
-
-      case SDLK_j:
-      {
-        m_lights[0].position.x -= 2.f;
-        break;
-      }
-      case SDLK_l:
-      {
-        m_lights[0].position.x += 2.f;
-        break;
-      }
-      case SDLK_i:
-      {
-        m_lights[0].position.y += 2.f;
-        break;
-      }
-      case SDLK_k:
-      {
-        m_lights[0].position.y -= 2.f;
-        break;
-      }
-
-      default: break;
-    }
-  }
-
-  if (m_nFilterIterations < 0) m_nFilterIterations = 0;
-}
-
-auto FluidRenderer::InitUniformBuffers() -> bool
-{
-  // Init uniform buffers data
-  GLCall(glGenBuffers(1, &m_uniformBufferCameraData));
-  GLCall(glGenBuffers(1, &m_uniformBufferLights));
-  GLCall(glGenBuffers(1, &m_uniformBufferMaterial));
-
-  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
-  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraData), nullptr, GL_DYNAMIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 0, m_uniformBufferCameraData, 0, sizeof(CameraData)));
-
-  // Size of Lights is the total number of lights + an int that stores the number of lights in the scene
-  constexpr int LIGHTS_UB_SIZE = sizeof(PointLight) * NUM_TOTAL_LIGHTS + sizeof(int);
-  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
-  GLCall(glBufferData(GL_UNIFORM_BUFFER, LIGHTS_UB_SIZE, nullptr, GL_STATIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 1, m_uniformBufferLights, 0, LIGHTS_UB_SIZE));
-
-  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
-  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(Material), nullptr, GL_STATIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 2, m_uniformBufferMaterial, 0, sizeof(Material)));
-
-  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
-
-  // Setup uniform buffers on render passes
-  for (auto& renderPassPair : m_renderPasses)
-  {
-    if (!renderPassPair.second->SetUniformBuffer("CameraData", 0))
-    {
-      LOG_ERROR("Unable to set CameraData uniform buffer on " + renderPassPair.first);
-    }
-
-    if (!renderPassPair.second->SetUniformBuffer("Lights", 1))
-    {
-      LOG_ERROR("Unable to set Lights uniform buffer on " + renderPassPair.first);
-    }
-    if (!renderPassPair.second->SetUniformBuffer("Material", 2))
-    {
-      LOG_ERROR("Unable to set Material uniform buffer on " + renderPassPair.first);
-    }
-  }
-
-  return true;
-}
-
-auto FluidRenderer::SetUpLights() -> void
-{
-  PointLight light;
-  light.ambient  = { .2f, .2f, .2f, .2f };
-  light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
-  light.specular = { 1.f, 1.f, 1.f, 1.f };
-
-  light.position = { -10, 20.f, 10.f, 1.f };
-
-  m_lights.push_back(light);
-
-  PointLight light2;
-  light2.ambient  = { .1f, .1f, .1f, 1.f };
-  light2.diffuse  = { .3f, .3f, .3f, 1.f };
-  light2.specular = { 1.f, 1.f, 1.f, 1.f };
-  light2.position = { 10, -20.f, -10.f, 1.f };
-}
-
-auto FluidRenderer::SetUpMaterial() -> void
-{
-  Material material;
-  material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
-  material.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
-  material.specular  = { 1.f, 1.f, 1.f, 1.f };
-  material.shininess = 250;
-
-  glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial);
-  glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
-}
 
 auto FluidRenderer::Update() -> void
 {
@@ -393,9 +460,18 @@ auto FluidRenderer::Render() -> void
 {
   UploadCameraData();
   UploadLights();
-  m_particleRenderPass->Render();
+  SetUpPerFrameUniforms();
+
+  // m_particleRenderPass->Render();
   m_depthPass->Render();
   m_thicknessPass->Render();
+
+  if (m_renderShadows)
+  {
+    m_meshesShadowPass->Render();
+    m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
+  }
+
   m_meshesPass->Render();
   
   for (int i = 0; i < m_nFilterIterations; i++)
@@ -419,7 +495,7 @@ auto FluidRenderer::Render() -> void
   m_compositionPass->Render();
 
   m_textureRenderer->SetTexture(
-      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_normalPass->GetBuffer()
+      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_meshesShadowPass->GetBuffer()
   );
 
   m_textureRenderer->Render();
@@ -449,13 +525,14 @@ auto FluidRenderer::UploadLights() -> void
 
   for (int i = 0; i < numLights; i++)
   {
-    glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights);
+    GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
     // Upload light 1
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_lights[i]);
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_lights[i]));
   }
 
   // Upload number of lights
-  glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights);
-  glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights));
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
+
 }

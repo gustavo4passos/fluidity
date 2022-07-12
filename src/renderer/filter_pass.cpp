@@ -104,10 +104,6 @@ void FilterPass::Render()
   ChangeOpenGLRenderState(previousRenderState);
 }
 
-void FilterPass::SetInputTexture(GLuint texture, int slot)
-{
-  m_textureBinds[slot] = texture;
-}
 
 void FilterPass::SwapBuffers(int textureSlot)
 {
@@ -121,24 +117,6 @@ void FilterPass::SwapBuffers(int textureSlot)
   // Detach render target 1, since it's being used as an input texture now
   m_framebuffer.DetachRenderTarget(1);
   m_framebuffer.Unbind();
-}
-
-void FilterPass::BindTextures()
-{
- for (auto& tPair : m_textureBinds)
-  {
-    GLCall(glActiveTexture(GL_TEXTURE0 + tPair.first));
-    GLCall(glBindTexture(GL_TEXTURE_2D, tPair.second));
-  }
-}
-
-void FilterPass::UnbindTextures()
-{
-  for (auto& tPair : m_textureBinds)
-  {
-    GLCall(glActiveTexture(GL_TEXTURE0 + tPair.first));
-    GLCall(glBindTexture(GL_TEXTURE_2D, 0));
-  }
 }
 
 }

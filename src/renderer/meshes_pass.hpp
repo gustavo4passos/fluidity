@@ -10,7 +10,11 @@ class MeshesPass : public RenderPass
 public:
     MeshesPass(int bufferWidth,
         int bufferHeight,
-        const std::vector<Model>& models = {});
+        const std::string& vsFilePath,
+        const std::string& fsFilePath,
+        const std::vector<FramebufferAttachment> attachments,
+        const std::vector<Model>& models = {}
+        );
 
     virtual bool Init() override;
     virtual void Render() override;
@@ -19,6 +23,8 @@ public:
 
 private:
     std::vector<Model> m_models;
-};
 
+    std::string m_vsFilePath;
+    std::string m_fsFilePath;
+};
 }
