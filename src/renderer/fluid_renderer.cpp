@@ -32,7 +32,8 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_cameraController(Camera({ 9.66f, 7.73f, 5 }, 45.f)),
   m_transparentFluid(true),
   m_renderShadows(true),
-  m_filteringParameters({ 3, 7, 100 })
+  m_filteringParameters({ 3, 7, 100 }),
+  m_shadowMapParameters({ 0.0005, 0.01, 1.0, true })
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -442,6 +443,10 @@ void FluidRenderer::SetUpPerFrameUniforms()
     meshesShader.Bind();
     meshesShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
     meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
+    meshesShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
+    meshesShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
+    meshesShader.SetUniform1f("uShadowIntensity", m_shadowMapParameters.shadowIntensity);
+    meshesShader.SetUniform1i("uUsePcf", m_shadowMapParameters.usePcf ? 1 : 0);
     meshesShader.Unbind();
 
     auto& compositionPassShader = m_compositionPass->GetShader();

@@ -56,6 +56,16 @@ void GuiLayer::Render()
         ImGui::Separator();
         ImGui::Checkbox("Render shadows", &m_fluidRenderer->m_renderShadows);
     }
+
+    if (ImGui::CollapsingHeader("Shadows"))
+    {
+        auto& shadowParameters = m_fluidRenderer->m_shadowMapParameters;
+        ImGui::DragFloat("Min Shadow Bias",  &shadowParameters.minShadowBias, 0.00001f, 0.f, 1.f);
+        ImGui::DragFloat("Max Shadow Bias",  &shadowParameters.maxShadowBias, 0.00001f, 0.f, 1.f);
+        ImGui::DragFloat("Shadow Intensity", &shadowParameters.shadowIntensity, 0.05f, 0.f, 1.f);
+        ImGui::Checkbox("PCF", &shadowParameters.usePcf);
+    }
+
     if (ImGui::CollapsingHeader("Filtering"))
     {
         ImGui::Checkbox("Transparent", &m_fluidRenderer->m_transparentFluid);

@@ -33,9 +33,14 @@ in vec4 fFragPosLightSpace;
 out vec3 fragColor;
 out float fragDepth;
 
+// Shadows
 uniform sampler2D uShadowMap;
 uniform mat4 uLightMatrix;
 uniform int uHasShadows;
+uniform float uMinShadowBias;
+uniform float uMaxShadowBias;
+uniform float uShadowIntensity;
+uniform int   uUsePcf;
 
 float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 {
@@ -51,20 +56,19 @@ float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 float inShadow(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 {
     float shadowBiasP = 0.007;
-    float shadowBias = max(0.008 * (1 - dot(fragNormal, lightDir)), 0.0005);
+    float shadowBias = max(uMaxShadowBias * (1 - dot(fragNormal, lightDir)), uMinShadowBias);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     vec3 texCoords = projCoords * 0.5 + 0.5;
     float closestDepth = texture(uShadowMap, texCoords.xy).r;
     float depth = projCoords.z;
-    if (depth - shadowBias > closestDepth) return 0.7;
+    if (depth - shadowBias > closestDepth) return uShadowIntensity;
     return 0.0;
 }
 
 float inShadowPCF(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 {
     
-    float shadowBiasP = 0.007;
-    float shadowBias = max(0.01 * (1 - dot(fragNormal, lightDir)), 0.0005);
+    float shadowBias = max(uMaxShadowBias * (1 - dot(fragNormal, lightDir)), uMinShadowBias);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     vec3 texCoords = projCoords * 0.5 + 0.5;
     
@@ -81,7 +85,7 @@ float inShadowPCF(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
     }
 
     shadow /= 25;
-    return shadow;
+    return shadow * uShadowIntensity;
 }
 
 void main()
@@ -98,7 +102,14 @@ void main()
     float shadow = 1;
     if (uHasShadows == 1)
     {
-        shadow = 1 - inShadowPCF(fFragPosLightSpace, normal, lightDir);
+        if (uUsePcf == 1)
+        {
+            shadow = 1 - inShadowPCF(fFragPosLightSpace, normal, lightDir);
+        }
+        else
+        {
+            shadow = 1 - inShadow(fFragPosLightSpace, normal, lightDir);
+        }
     }
     fragColor     = (max(dot(normal, lightDir), 0.0) * shadow * lights[0].diffuse.xyz + lights[0].ambient.xyz) * color;
 

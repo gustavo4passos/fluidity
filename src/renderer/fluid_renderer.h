@@ -25,10 +25,17 @@ struct FilteringParameters
   int maxFilterSize;
 };
 
-enum class RenderMode
+struct FluidRenderingParameters
 {
-  Normals,
-  Fluid
+  float attenuation;
+};
+
+struct ShadowMapParameters
+{
+  float minShadowBias;
+  float maxShadowBias;
+  float shadowIntensity;
+  bool  usePcf;
 };
 
 class FluidRenderer : public Renderer
@@ -83,6 +90,7 @@ private:
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
   FilteringParameters m_filteringParameters;
+  ShadowMapParameters m_shadowMapParameters;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;
