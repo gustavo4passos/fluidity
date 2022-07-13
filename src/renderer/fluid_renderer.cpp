@@ -32,7 +32,7 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_cameraController(Camera({ 9.66f, 7.73f, 5 }, 45.f)),
   m_transparentFluid(true),
   m_renderShadows(true),
-  m_nFilterIterations(3) //TODO: Should be configurable
+  m_filteringParameters({ 3, 7, 100 })
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -103,8 +103,8 @@ auto FluidRenderer::Init() -> bool
   );
 
   m_meshesShadowPass = new MeshesPass(
-    m_windowWidth,
-    m_windowHeight,
+    2048,
+    2048,
     "../../shaders/mesh-shadow.vert",
     "../../shaders/mesh-shadow.frag",
     {
@@ -142,10 +142,10 @@ auto FluidRenderer::Init() -> bool
   {
     auto& meshesRenderState = m_meshesPass->GetRenderState();
     meshesRenderState.clearColor = { 234.f / 255.f, 221.f / 255.f, 202.f / 255.f, 1.f };
-    Model m("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
-    m.Load(true); // Smooth normals
-    m_meshesPass->AddModel(m);
-    m_meshesShadowPass->AddModel(m);
+    Model canyon("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
+    canyon.Load(true); // Smooth normals
+    m_meshesPass->AddModel(canyon);
+    m_meshesShadowPass->AddModel(canyon);
 
     auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
     meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
@@ -200,23 +200,19 @@ auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void
       // Filter iterations
       case (SDLK_UP):
       {
-        m_nFilterIterations++;
+        m_filteringParameters.nIterations++;
         break;
       } 
 
       case (SDLK_DOWN):
       {
-        m_nFilterIterations--;
+        m_filteringParameters.nIterations--;
         break;
       }
 
       case (SDLK_t):
       {
         m_transparentFluid = !m_transparentFluid;
-        auto& compositionPassShader = m_compositionPass->GetShader();
-        compositionPassShader.Bind();
-        compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-        compositionPassShader.Unbind();
         break;
       }
 
@@ -265,7 +261,7 @@ auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void
     }
   }
 
-  if (m_nFilterIterations < 0) m_nFilterIterations = 0;
+  if (m_filteringParameters.nIterations < 0) m_filteringParameters.nIterations = 0;
 }
 
 auto FluidRenderer::InitUniformBuffers() -> bool
@@ -382,10 +378,10 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     auto& narrowFilterShader = m_filterPass->GetShader();
     narrowFilterShader.Bind();
     narrowFilterShader.SetUniform1i("u_DoFilter1D", 0);
-    narrowFilterShader.SetUniform1i("u_FilterSize", 7);
     narrowFilterShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     narrowFilterShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
-    narrowFilterShader.SetUniform1i("u_MaxFilterSize", 100);
+    narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
+    narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
     narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
     narrowFilterShader.Unbind();
   }
@@ -447,6 +443,18 @@ void FluidRenderer::SetUpPerFrameUniforms()
     meshesShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
     meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
     meshesShader.Unbind();
+
+    auto& compositionPassShader = m_compositionPass->GetShader();
+    compositionPassShader.Bind();
+    compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
+    compositionPassShader.Unbind();
+
+    auto& narrowFilterShader = m_filterPass->GetShader();
+    narrowFilterShader.Bind();
+    narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
+    narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
+    // narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
+    narrowFilterShader.Unbind();
   }
 }
 
@@ -474,14 +482,14 @@ auto FluidRenderer::Render() -> void
 
   m_meshesPass->Render();
   
-  for (int i = 0; i < m_nFilterIterations; i++)
+  for (int i = 0; i < m_filteringParameters.nIterations; i++)
   {
     if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
     else m_filterPass->SwapBuffers();
     m_filterPass->Render();
   }
 
-  const auto& depthTexture = m_nFilterIterations > 0 ? m_filterPass->GetBuffer() : 
+  const auto& depthTexture = m_filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
     m_depthPass->GetBuffer();
 
   m_normalPass->SetInputTexture(depthTexture);

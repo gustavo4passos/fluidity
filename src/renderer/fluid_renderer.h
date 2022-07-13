@@ -18,6 +18,19 @@
 namespace fluidity
 {
 
+struct FilteringParameters
+{
+  int nIterations;
+  int filterSize;
+  int maxFilterSize;
+};
+
+enum class RenderMode
+{
+  Normals,
+  Fluid
+};
+
 class FluidRenderer : public Renderer
 {
 public:
@@ -35,6 +48,7 @@ public:
   auto GetFiltering() -> bool { return m_filteringEnabled; }
   auto ProcessInput(const SDL_Event& event) -> void;
 
+  friend class GuiLayer;
 private:
   bool InitUniformBuffers();
   void UploadCameraData();
@@ -68,7 +82,7 @@ private:
   GLuint m_uniformBufferMaterial;
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
-  int m_nFilterIterations;
+  FilteringParameters m_filteringParameters;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;
@@ -79,6 +93,6 @@ private:
 
   bool m_filteringEnabled;
   bool m_renderShadows;
-  int m_transparentFluid;
+  bool m_transparentFluid;
 };
 }

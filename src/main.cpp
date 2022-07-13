@@ -5,6 +5,7 @@
 #include "renderer/fluid_renderer.h"
 #include "renderer/window.h"
 #include "utils/logger.h"
+#include "utils/gui_layer.hpp"
 
 struct CommandLineArgs 
 {
@@ -82,12 +83,16 @@ int main(int argc, char* args[])
     int currentFrame = 0;
 
     SDL_CaptureMouse(SDL_TRUE);
+    fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
+    gui.Init();
+
     while(running) 
     {
         SDL_Event e;
 
         while(SDL_PollEvent(&e)) 
         {
+            if (gui.ProcessEvent(e)) continue;
 
             if(e.type == SDL_QUIT) running = false;
             if(e.type == SDL_KEYUP)
@@ -114,6 +119,7 @@ int main(int argc, char* args[])
         renderer->SetVAO(f.GetFrameVao(currentFrame));
         renderer->Update();
         renderer->Render();
+        gui.Render();
 
         if (playing) currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();
 

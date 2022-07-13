@@ -37,6 +37,8 @@ public:
 	friend class InfoMenuGL3;
 	friend class LevelEditorState;
 
+	SDL_Window* GetSDLWindow() { return _windowHndl; }
+	SDL_GLContext GetSDLGLContext() { return _openGLContext; }
 private:
 	const char* _title;
 	int _width;

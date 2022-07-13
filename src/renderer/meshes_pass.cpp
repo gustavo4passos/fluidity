@@ -29,6 +29,9 @@ bool MeshesPass::Init()
 void MeshesPass::Render()
 {
     assert(m_shader != nullptr);
+    int viewportState[4];
+    glGetIntegerv(GL_VIEWPORT, viewportState);
+
     // Save OpenGL state before changing it
     RenderState previousRenderState;
     previousRenderState = GetCurrentOpenGLRenderState();
@@ -36,6 +39,7 @@ void MeshesPass::Render()
     m_framebuffer.Bind();
     m_shader->Bind();
     ChangeOpenGLRenderState(m_renderState);
+    glViewport(0, 0, m_bufferWidth, m_bufferHeight);
     BindTextures();
 
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
@@ -73,6 +77,7 @@ void MeshesPass::Render()
     m_shader->Unbind();
     m_framebuffer.Unbind();
 
+    glViewport(viewportState[0], viewportState[1], viewportState[2], viewportState[3]);
     ChangeOpenGLRenderState(previousRenderState);
 
 }

@@ -71,16 +71,16 @@ float inShadowPCF(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
     vec2 texelSize = 1.0 / textureSize(uShadowMap, 0);
     float depth = projCoords.z;
     float shadow = 0.0;
-    for (int x = -1; x <= 1; x++)
+    for (int x = -2; x <= 2; x++)
     {
-        for (int y = -1; y <= 1; y++)
+        for (int y = -2; y <= 2; y++)
         {
             float closestDepth = texture(uShadowMap, texCoords.xy + vec2(x, y) * texelSize).r;
             shadow += depth - shadowBias > closestDepth ? 1.0 : 0.0;
         }
     }
 
-    shadow /= 9.0;
+    shadow /= 25;
     return shadow;
 }
 
@@ -100,7 +100,7 @@ void main()
     {
         shadow = 1 - inShadowPCF(fFragPosLightSpace, normal, lightDir);
     }
-    fragColor     = (max(dot(normal, lightDir), 0.0) * shadow + ambient) * color;
+    fragColor     = (max(dot(normal, lightDir), 0.0) * shadow * lights[0].diffuse.xyz + lights[0].ambient.xyz) * color;
 
     vec4 clipSpacePos = projectionMatrix * vec4(fFragEyePos, 1.0);
     fragDepth = -(projectionMatrix * vec4(fFragEyePos, 1.0)).z;
