@@ -13,6 +13,10 @@ namespace fluidity
     void ProcessInput(const SDL_Event& e);
     void Update();
 
+    float GetYaw()   { return m_yaw;   };
+    float GetPitch() { return m_pitch; };
+
+
   private:
     void ProcessMouse();
     Camera m_camera;

@@ -26,12 +26,12 @@ bool RenderPass::Init()
 
 bool RenderPass::SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding)
 {
-  GLuint index = glGetUniformBlockIndex(m_shader->programID(), name.c_str());
-  if (index == GL_INVALID_INDEX) return false;
+  return m_shader->SetUniformBuffer(name.c_str(), uniformBlockBinding);
+}
 
-  GLCall(glUniformBlockBinding(m_shader->programID(), index, 
-        uniformBlockBinding));
-  
+bool RenderPass::SetUniformBufferForShader(const std::string& name, GLuint uniformBlockBinding, 
+  Shader* shader)
+{
   return true;
 }
 

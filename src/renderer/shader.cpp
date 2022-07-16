@@ -47,6 +47,17 @@ void Shader::SetUniformMat4(const char* name, const void* data){
   GLCall(glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, (const GLfloat*)data));
 }
 
+bool Shader::SetUniformBuffer (const char* name, GLuint blockBinding)
+{
+  GLuint index = glGetUniformBlockIndex(_programID, name);
+  if (index == GL_INVALID_INDEX) return false;
+
+  GLCall(glUniformBlockBinding(_programID, index, 
+        blockBinding));
+  
+  return true;
+}
+
 void Shader::SetUniform3fv(const char* name, GLfloat* v0)
 {
   GLCall(glUniform3fv(GetUniformLocation(name), 1, v0));

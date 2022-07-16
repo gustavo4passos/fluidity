@@ -12,8 +12,8 @@ namespace fluidity
     m_mouseClicked(false)
   { 
     // TODO: These should not be hardcoded
-    m_yaw = 170;
-    m_pitch = -15.6;
+    m_yaw = 177;
+    m_pitch = -21;
 
     int x, y;
     SDL_GetMouseState(&x, &y);

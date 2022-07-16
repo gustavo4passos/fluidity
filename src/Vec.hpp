@@ -37,6 +37,12 @@ struct PointLight {
   Vec4 position;
 };
 
+struct LightMatrix
+{
+  Mat4 viewMatrix;
+  Mat4 projectionMatrix;
+};
+
 struct Material {
   Vec4 ambient;
   Vec4 diffuse;

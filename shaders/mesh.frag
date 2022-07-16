@@ -35,7 +35,6 @@ out float fragDepth;
 
 // Shadows
 uniform sampler2D uShadowMap;
-uniform mat4 uLightMatrix;
 uniform int uHasShadows;
 uniform float uMinShadowBias;
 uniform float uMaxShadowBias;

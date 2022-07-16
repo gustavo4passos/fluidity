@@ -67,6 +67,7 @@ private:
 
   GLuint m_currentVAO;
 
+  Shader* m_skybBoxShader;
   // Render passes
   TextureRenderer*    m_textureRenderer;
   ParticleRenderPass* m_particleRenderPass;
@@ -82,15 +83,18 @@ private:
 
   // Useful for performing operations that affect every render pass
   std::unordered_map<std::string, RenderPass*> m_renderPasses;
-  std::vector<PointLight> m_lights;
+  std::vector<PointLight>  m_lights;
+  std::vector<LightMatrix> m_lightMatrices;
   
   GLuint m_uniformBufferCameraData;
   GLuint m_uniformBufferLights;
+  GLuint m_uniformBufferLightMatrices;
   GLuint m_uniformBufferMaterial;
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
   FilteringParameters m_filteringParameters;
   ShadowMapParameters m_shadowMapParameters;
+  FluidRenderingParameters m_fluidRenderingParameters;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;

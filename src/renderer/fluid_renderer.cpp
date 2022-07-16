@@ -1,15 +1,15 @@
-#include "fluid_renderer.h"
+#include "fluid_renderer.hpp"
 #include "utils/glcall.h"
 #include "utils/opengl_utils.hpp"
-#include "../utils/logger.h"
-#include "../vec.hpp"
+#include "renderer/skybox.hpp"
+#include "utils/logger.h"
+#include "vec.hpp"
 #include <SDL2/SDL.h>
 #include <cmath>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+
 
 namespace fluidity
 {
@@ -29,11 +29,12 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_aspectRatio((float) windowWidth / windowHeight),
   m_pointRadius(pointRadius),
   m_filteringEnabled(true),
-  m_cameraController(Camera({ 9.66f, 7.73f, 5 }, 45.f)),
+  m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
   m_transparentFluid(true),
   m_renderShadows(true),
-  m_filteringParameters({ 3, 7, 100 }),
-  m_shadowMapParameters({ 0.0005, 0.01, 1.0, true })
+  m_filteringParameters({ 4, 7, 100 }),
+  m_shadowMapParameters({ 0.001, 0.01, 0.5, true }),
+  m_fluidRenderingParameters({ 0.25 })
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -142,11 +143,18 @@ auto FluidRenderer::Init() -> bool
   // Meshes pass -> Setup
   {
     auto& meshesRenderState = m_meshesPass->GetRenderState();
-    meshesRenderState.clearColor = { 234.f / 255.f, 221.f / 255.f, 202.f / 255.f, 1.f };
+    meshesRenderState.clearColor = { 206.f / 255.f, 96.f / 255.f, 44.f / 255.f, 1.f };
     Model canyon("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
-    canyon.Load(true); // Smooth normals
+    canyon.Load(); // Smooth normals
     m_meshesPass->AddModel(canyon);
     m_meshesShadowPass->AddModel(canyon);
+
+    // Skybox
+    Skybox skybox("C:\\dev\\assets\\skyboxes\\canyon");
+    if (skybox.Init())
+    {
+      m_meshesPass->AddSkybox(skybox);
+    }
 
     auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
     meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
@@ -188,81 +196,6 @@ auto FluidRenderer::SetFiltering(bool enabled) -> void
 auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
 {
   m_cameraController.ProcessInput(e);
-
-  if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_f)
-  {
-    SetFiltering(!m_filteringEnabled);
-  }
-
-  if (e.type == SDL_KEYUP)
-  {
-    switch (e.key.keysym.sym)
-    {
-      // Filter iterations
-      case (SDLK_UP):
-      {
-        m_filteringParameters.nIterations++;
-        break;
-      } 
-
-      case (SDLK_DOWN):
-      {
-        m_filteringParameters.nIterations--;
-        break;
-      }
-
-      case (SDLK_t):
-      {
-        m_transparentFluid = !m_transparentFluid;
-        break;
-      }
-
-      // Render shadows
-      case (SDLK_r):
-      {
-        m_renderShadows = !m_renderShadows;
-        break;
-      }
-
-      // Light control
-      case SDLK_j:
-      {
-        m_lights[0].position.x -= 2.f;
-        break;
-      }
-      case SDLK_l:
-      {
-        m_lights[0].position.x += 2.f;
-        break;
-      }
-      case SDLK_i:
-      {
-        m_lights[0].position.y += 2.f;
-        break;
-      }
-      case SDLK_k:
-      {
-        m_lights[0].position.y -= 2.f;
-        break;
-      }
-
-      case SDLK_y:
-      {
-        m_lights[0].position.z += 2.f;
-        break;
-      }
-
-      case SDLK_h:
-      {
-        m_lights[0].position.z -= 2.f;
-        break;
-      }
-
-      default: break;
-    }
-  }
-
-  if (m_filteringParameters.nIterations < 0) m_filteringParameters.nIterations = 0;
 }
 
 auto FluidRenderer::InitUniformBuffers() -> bool
@@ -271,36 +204,53 @@ auto FluidRenderer::InitUniformBuffers() -> bool
   GLCall(glGenBuffers(1, &m_uniformBufferCameraData));
   GLCall(glGenBuffers(1, &m_uniformBufferLights));
   GLCall(glGenBuffers(1, &m_uniformBufferMaterial));
+  GLCall(glGenBuffers(1, &m_uniformBufferLightMatrices));
+
+  constexpr int CAMERA_DATA_UB_INDEX = 0;
+  constexpr int LIGHTS_UB_INDEX = 1;
+  constexpr int LIGHT_MATRICES_UB_INDEX = 2;
+  constexpr int MATERIAL_UB_INDEX = 3;
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
   GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraData), nullptr, GL_DYNAMIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 0, m_uniformBufferCameraData, 0, sizeof(CameraData)));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, CAMERA_DATA_UB_INDEX, 
+    m_uniformBufferCameraData, 0, sizeof(CameraData)));
 
   // Size of Lights is the total number of lights + an int that stores the number of lights in the scene
   constexpr int LIGHTS_UB_SIZE = sizeof(PointLight) * NUM_TOTAL_LIGHTS + sizeof(int);
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
   GLCall(glBufferData(GL_UNIFORM_BUFFER, LIGHTS_UB_SIZE, nullptr, GL_STATIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 1, m_uniformBufferLights, 0, LIGHTS_UB_SIZE));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, LIGHTS_UB_INDEX, m_uniformBufferLights, 0, 
+    LIGHTS_UB_SIZE));
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLightMatrices));
+  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(LightMatrix) * NUM_TOTAL_LIGHTS, nullptr, GL_DYNAMIC_DRAW));
+  glBindBufferRange(GL_UNIFORM_BUFFER, LIGHT_MATRICES_UB_INDEX, m_uniformBufferLightMatrices,
+    0, sizeof(LightMatrix) * NUM_TOTAL_LIGHTS);
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
   GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(Material), nullptr, GL_STATIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, 2, m_uniformBufferMaterial, 0, sizeof(Material)));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, MATERIAL_UB_INDEX, m_uniformBufferMaterial, 0, sizeof(Material)));
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
   // Setup uniform buffers on render passes
   for (auto& renderPassPair : m_renderPasses)
   {
-    if (!renderPassPair.second->SetUniformBuffer("CameraData", 0))
+    if (!renderPassPair.second->SetUniformBuffer("CameraData", CAMERA_DATA_UB_INDEX))
     {
       LOG_ERROR("Unable to set CameraData uniform buffer on " + renderPassPair.first);
     }
 
-    if (!renderPassPair.second->SetUniformBuffer("Lights", 1))
+    if (!renderPassPair.second->SetUniformBuffer("Lights", LIGHTS_UB_INDEX))
     {
       LOG_ERROR("Unable to set Lights uniform buffer on " + renderPassPair.first);
     }
-    if (!renderPassPair.second->SetUniformBuffer("Material", 2))
+    if (!renderPassPair.second->SetUniformBuffer("LightMatrices", LIGHT_MATRICES_UB_INDEX))
+    {
+      LOG_ERROR("Unable to set LightMatrices uniform buffer on " + renderPassPair.first);
+    }
+    if (!renderPassPair.second->SetUniformBuffer("Material", MATERIAL_UB_INDEX))
     {
       LOG_ERROR("Unable to set Material uniform buffer on " + renderPassPair.first);
     }
@@ -316,7 +266,7 @@ auto FluidRenderer::SetUpLights() -> void
   light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
   light.specular = { 1.f, 1.f, 1.f, 1.f };
 
-  light.position = { -10, 12.f, -4.f, 1.f };
+  light.position = { -16, 24.f, 7.5f, 1.f };
 
   m_lights.push_back(light);
 
@@ -401,14 +351,14 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     auto& compositionPassShader = m_compositionPass->GetShader();
     compositionPassShader.Bind();
     compositionPassShader.SetUniform1i("u_HasSolid", 1);
-    compositionPassShader.SetUniform1i("u_HasShadow", 0);
-    compositionPassShader.SetUniform1i("u_DepthTex", 0);
-    compositionPassShader.SetUniform1i("u_ThicknessTex", 1);
-    compositionPassShader.SetUniform1i("u_NormalTex", 2);
-    compositionPassShader.SetUniform1i("u_BackgroundTex", 3);
-    compositionPassShader.SetUniform1i("u_SolidDepthMap", 4);
+    compositionPassShader.SetUniform1i("u_DepthTex",            0);
+    compositionPassShader.SetUniform1i("u_ThicknessTex",        1);
+    compositionPassShader.SetUniform1i("u_NormalTex",           2);
+    compositionPassShader.SetUniform1i("u_BackgroundTex",       3);
+    compositionPassShader.SetUniform1i("u_SolidDepthMap",       4);
+    compositionPassShader.SetUniform1i("u_SolidShadowMaps[0]",  5);
+    compositionPassShader.SetUniform1i("u_SkyBoxTex",           6);
     compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", 0.25f);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
@@ -416,6 +366,25 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
 
 void FluidRenderer::SetUpPerFrameUniforms()
 {
+  UploadCameraData();
+  UploadLights();
+
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLightMatrices));
+  for (int i = 0; i < m_lights.size(); i++)
+  {
+    auto& l = m_lights[i];
+    float radius = 10.f;
+    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
+    // Find light matrix
+    glm::mat4 lightView = glm::lookAt(glm::vec3(l.position.x, l.position.y, l.position.z),
+      glm::vec3(0), // directional light, pointing at scene origin
+      glm::vec3(0, 1.0, 0));
+
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Mat4), glm::value_ptr(lightView)));
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Mat4), sizeof(Mat4), glm::value_ptr(lightProjection)));
+  }
+  GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+
   // Meshes shadow pass
   // TODO: This can be done in one pass using the messes pass? Possibly
   // using alpha blending to generate depth
@@ -434,14 +403,8 @@ void FluidRenderer::SetUpPerFrameUniforms()
     
     glm::mat4 lightMatrix = lightProjection * lightView;
 
-    auto& meshesShadowShader = m_meshesShadowPass->GetShader();
-    meshesShadowShader.Bind();
-    meshesShadowShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
-    meshesShadowShader.Unbind();
-
     auto& meshesShader = m_meshesPass->GetShader();
     meshesShader.Bind();
-    meshesShader.SetUniformMat4("uLightMatrix", glm::value_ptr(lightMatrix));
     meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
     meshesShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
     meshesShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
@@ -452,13 +415,16 @@ void FluidRenderer::SetUpPerFrameUniforms()
     auto& compositionPassShader = m_compositionPass->GetShader();
     compositionPassShader.Bind();
     compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
+    // compositionPassShader.SetUniform1i("u_HasShadow", m_renderShadows ? 1 : 0);
+    compositionPassShader.SetUniform1f("u_ShadowIntensity", m_shadowMapParameters.shadowIntensity);
+    compositionPassShader.SetUniform1f("u_AttennuationConstant", m_fluidRenderingParameters.attenuation);
     compositionPassShader.Unbind();
 
     auto& narrowFilterShader = m_filterPass->GetShader();
     narrowFilterShader.Bind();
     narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
     narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
-    // narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
+    narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
     narrowFilterShader.Unbind();
   }
 }
@@ -471,8 +437,6 @@ auto FluidRenderer::Update() -> void
 
 auto FluidRenderer::Render() -> void
 {
-  UploadCameraData();
-  UploadLights();
   SetUpPerFrameUniforms();
 
   // m_particleRenderPass->Render();
@@ -500,12 +464,17 @@ auto FluidRenderer::Render() -> void
   m_normalPass->SetInputTexture(depthTexture);
   m_normalPass->Render();
 
+  GLuint skyboxTextureID = m_meshesPass->GetSkybox().GetTextureID();
   m_compositionPass->SetInputTexture(depthTexture, 0);
-  m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(), 1);
-  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(), 2);
-  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(), 3);
-  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1), 4);
+  m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(),     1);
+  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(),        2);
+  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
+  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
+  m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
+  glActiveTexture(GL_TEXTURE0 + 6);
+  glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
   m_compositionPass->Render();
+  glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
   m_textureRenderer->SetTexture(
       m_filteringEnabled ? m_compositionPass->GetBuffer() : m_meshesShadowPass->GetBuffer()
@@ -541,6 +510,15 @@ auto FluidRenderer::UploadLights() -> void
     GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
     // Upload light 1
     GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_lights[i]));
+
+    float radius = 10.f;
+    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
+    glm::mat4 lightView = glm::lookAt(glm::vec3(m_lights[i].position.x, 
+      m_lights[i].position.y, m_lights[i].position.z),
+      glm::vec3(0), // directional light, pointing at scene origin
+      glm::vec3(0, 1.0, 0));
+    
+    glm::mat4 lightMatrix = lightProjection * lightView;
   }
 
   // Upload number of lights

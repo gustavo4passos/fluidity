@@ -46,6 +46,8 @@ public:
   void UnbindTextures();
 
 protected:
+  virtual bool SetUniformBufferForShader(const std::string& name, GLuint uniformBlockBinding, 
+      Shader* shader);
   virtual void ChangeOpenGLRenderState(const RenderState& state);
   virtual RenderState GetCurrentOpenGLRenderState();
 

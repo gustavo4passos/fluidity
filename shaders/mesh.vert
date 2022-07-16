@@ -28,7 +28,17 @@ layout(std140) uniform CameraData
     vec4 camPosition;
 };
 
-uniform mat4 uLightMatrix;
+struct LightMatrix
+{
+    mat4 viewMatrix;
+    mat4 prjMatrix;
+};
+
+layout(std140) uniform LightMatrices
+{
+    LightMatrix lightMatrices[NUM_TOTAL_LIGHTS];
+};
+
 uniform mat4 projection;
 uniform mat4 view;
 
@@ -42,6 +52,6 @@ void main()
     gl_Position = projectionMatrix * viewMatrix * vec4(vPos - vec3(0, 0.3, 0), 1.0);
     fNormal = vNormal;  
     fFragPos = vPos;
-    fFragPosLightSpace = uLightMatrix * vec4(vPos, 1.0);
+    fFragPosLightSpace = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * vec4(vPos, 1.0);
     fFragEyePos = (viewMatrix * vec4(vPos, 1.0)).xyz;
 }

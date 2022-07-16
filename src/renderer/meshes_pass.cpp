@@ -15,7 +15,8 @@ MeshesPass::MeshesPass(int bufferWidth,
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
     m_models(models),
     m_vsFilePath(vsFilePath),
-    m_fsFilePath(fsFilePath)
+    m_fsFilePath(fsFilePath),
+    m_hasSkybox(false)
 {
     for (const auto& attachment : attachments) m_framebuffer.PushAttachment(attachment);
 }
@@ -23,6 +24,9 @@ MeshesPass::MeshesPass(int bufferWidth,
 bool MeshesPass::Init()
 {
     m_shader = new Shader(m_vsFilePath, m_fsFilePath);
+    m_skybBoxShader = new Shader("../../shaders/skybox.vert",
+    "../../shaders/skybox.frag");
+
     return RenderPass::Init();
 }
 
@@ -37,14 +41,26 @@ void MeshesPass::Render()
     previousRenderState = GetCurrentOpenGLRenderState();
 
     m_framebuffer.Bind();
-    m_shader->Bind();
     ChangeOpenGLRenderState(m_renderState);
     glViewport(0, 0, m_bufferWidth, m_bufferHeight);
-    BindTextures();
 
     GLCall(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     float minusInfinity = -1000000.f;
     GLCall(glClearBufferfv(GL_COLOR, 1, &minusInfinity));
+
+    if (m_hasSkybox)
+    {
+        // TODO: Check if depth mask is active before changing it
+        glDepthMask(GL_FALSE);
+        if (previousRenderState.useDepthTest) glDisable(GL_DEPTH_TEST);
+        RenderSkybox();
+        if (previousRenderState.useDepthTest) glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+    } 
+
+    m_shader->Bind();
+    BindTextures();
+
 
     for (auto& model : m_models)
     {
@@ -73,6 +89,7 @@ void MeshesPass::Render()
     // std::cin.get();
     // std::cin.ignore();
     UnbindTextures();
+
     GLCall(glBindVertexArray(0));
     m_shader->Unbind();
     m_framebuffer.Unbind();
@@ -81,5 +98,35 @@ void MeshesPass::Render()
     ChangeOpenGLRenderState(previousRenderState);
 
 }
+
+void MeshesPass::RenderSkybox()
+{
+    m_skybBoxShader->Bind();
+    GLCall(glBindVertexArray(m_skybox.GetVao()));
+    GLCall(glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox.GetTextureID()));
+    GLCall(glDrawArrays(GL_TRIANGLES, 0, 36));
+}
+
+bool MeshesPass::SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding)
+{
+    if (!m_shader->SetUniformBuffer(name.c_str(), uniformBlockBinding))        return false;
+    if (!m_skybBoxShader->SetUniformBuffer(name.c_str(), uniformBlockBinding)) return false;
+    return false;
+}
+
+void MeshesPass::AddSkybox(const Skybox& skybox)
+{
+    if (m_hasSkybox) m_skybox.CleanUp();
+
+    m_hasSkybox = true;
+    m_skybox = skybox;
+}
+
+Skybox& MeshesPass::GetSkybox()
+{
+    assert(m_hasSkybox);
+    return m_skybox;
+}
+
 
 }

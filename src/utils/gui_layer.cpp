@@ -1,5 +1,5 @@
 #include "utils/gui_layer.hpp"
-#include "renderer/fluid_renderer.h"
+#include "renderer/fluid_renderer.hpp"
 #include <imgui_impl_sdl.h>
 #include <imgui_impl_opengl3.h>
 
@@ -41,15 +41,18 @@ void GuiLayer::Render()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
-    static bool showDemoWindow = true;
-    ImGui::ShowDemoWindow(&showDemoWindow);
+    // static bool showDemoWindow = true;
+    // ImGui::ShowDemoWindow(&showDemoWindow);
 
     ImGui::Begin("Parameters");
+
     if (ImGui::CollapsingHeader("Lighting"))
     {
         auto& light = m_fluidRenderer->m_lights[0];
         ImGui::Text("Light");
+        ImGui::PushID((int)&light);
         ImGui::DragFloat3("Position", (float*)&light.position, 0.5, -100.f, 100.f);
+        ImGui::PopID();
         ImGui::ColorEdit3("Diffuse", (float*)&light.diffuse);
         ImGui::ColorEdit3("Ambient", (float*)&light.ambient);
         ImGui::ColorEdit3("Specular", (float*)&light.specular);
@@ -70,7 +73,7 @@ void GuiLayer::Render()
     {
         ImGui::Checkbox("Transparent", &m_fluidRenderer->m_transparentFluid);
         auto& filteringParameters = m_fluidRenderer->m_filteringParameters;
-        ImGui::SliderInt("Number of iterations", &filteringParameters.nIterations, 0, 20);
+        ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
         ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
         ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
     }
@@ -79,6 +82,33 @@ void GuiLayer::Render()
     {
         auto& renderState = m_fluidRenderer->m_meshesPass->GetRenderState();
         ImGui::ColorEdit3("Background color", (float*)&renderState.clearColor);
+    }
+
+    if (ImGui::CollapsingHeader("Camera"))
+    {
+        auto& camera = m_fluidRenderer->m_cameraController.GetCamera();
+        auto positionGlm = camera.GetPosition();
+        vec3 position = { positionGlm.x, positionGlm.y, positionGlm.z };
+        ImGui::DragFloat3("Position", (float*)&position, 0.5f, -300.f, 300.f);
+        camera.SetPosition({ position.x, position.y, position.z });
+
+        float fov = camera.GetFOV();
+        ImGui::DragFloat("FOV", &fov, 0.5, 1, 179);
+        camera.SetFOV(fov);
+
+        auto& cameraController = m_fluidRenderer->m_cameraController;
+        float yaw   = cameraController.GetYaw();
+        float pitch = cameraController.GetPitch();
+
+        ImGui::DragFloat("Yaw", (float*)&yaw, 0.5, -100, 100);
+        ImGui::DragFloat("Pitch", (float*)&pitch, 0.5, -100, 100);
+    }
+
+     if (ImGui::CollapsingHeader("Fluid"))
+    {
+        auto& fluidRenderingParameters = m_fluidRenderer->m_fluidRenderingParameters;
+        ImGui::DragFloat("Attenuatiuon", (float*)&fluidRenderingParameters, 0.005f, 0.f, 1.f);
+        
     }
     
     ImGui::End();
