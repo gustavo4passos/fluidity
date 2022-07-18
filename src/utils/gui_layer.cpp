@@ -76,6 +76,7 @@ void GuiLayer::Render()
         ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
         ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
         ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
+        ImGui::Checkbox("Gamma Correction", &filteringParameters.gammaCorrection);
     }
 
     if (ImGui::CollapsingHeader("Background"))

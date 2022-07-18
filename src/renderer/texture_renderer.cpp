@@ -1,5 +1,6 @@
 #include "texture_renderer.h"
 #include "../utils/glcall.h"
+#include <cassert>
 
 namespace fluidity
 {
@@ -65,6 +66,7 @@ namespace fluidity
 
     auto TextureRenderer::Render() -> void
     {
+        assert(m_textureShader != nullptr);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_textureShader->Bind();
         GLCall(glActiveTexture(GL_TEXTURE0));
@@ -75,6 +77,14 @@ namespace fluidity
 
         GLCall(glBindVertexArray(0));
         GLCall(glBindTexture(GL_TEXTURE_2D ,0));
+        m_textureShader->Unbind();
+    }
+
+    void TextureRenderer::SetGammaCorrectionEnabled(bool status)
+    {
+        assert(m_textureShader != nullptr);
+        m_textureShader->Bind();
+        m_textureShader->SetUniform1i("gammaCorrectionEnabled", status ? 1 : 0);
         m_textureShader->Unbind();
     }
 }

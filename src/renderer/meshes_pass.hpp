@@ -19,7 +19,7 @@ public:
 
   virtual bool Init() override;
   virtual void Render() override;
-  virtual void RenderSkybox();
+  virtual void RenderSkybox(const RenderState& previousRenderState);
   virtual bool SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding) override;
 
   void AddModel(const Model& model) { m_models.push_back(model); };

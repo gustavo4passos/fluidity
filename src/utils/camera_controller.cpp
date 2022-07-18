@@ -18,10 +18,12 @@ namespace fluidity
     int x, y;
     SDL_GetMouseState(&x, &y);
     m_lastMousePosition = glm::vec2(x, y);
+    m_gameController.Init();
   }
 
   void CameraController::ProcessInput(const SDL_Event& e)
   {
+    m_gameController.ProcessEvent(e);
     if (e.type == SDL_KEYDOWN)
     {
       switch(e.key.keysym.sym)
@@ -130,8 +132,14 @@ namespace fluidity
 
     float sensitivity = .2f; 
     m_yaw   += mouseMove.x * sensitivity;
-    m_pitch -= mouseMove.y * sensitivity;
+    m_pitch - mouseMove.y * sensitivity;
 
+    SetPitch(m_pitch - mouseMove.y * sensitivity);
+  }
+
+  void CameraController::SetPitch(float pitch)
+  {
+    m_pitch = pitch;
     if (m_pitch >  89.f) m_pitch =  89.f;
     if (m_pitch < -89.f) m_pitch = -89.f;
   }
@@ -139,6 +147,23 @@ namespace fluidity
   void CameraController::Update() 
   {
     ProcessMouse();
+
+#if GAME_CONTROLLER_ENABLED
+    if (m_gameController.IsControllerConnected())
+    {
+      AxisStatus axisStatus = m_gameController.GetAxisStatus();
+
+      m_yaw += axisStatus.rightAxis.x;
+      SetPitch(m_pitch - axisStatus.rightAxis.y);
+
+      m_movingOnAxis.x = axisStatus.leftAxis.x;
+      m_movingOnAxis.z = -axisStatus.leftAxis.y;
+
+      m_movingOnAxis.y = -axisStatus.triggers.x;
+      if (axisStatus.triggers.y > 0) m_movingOnAxis.y = axisStatus.triggers.y;
+    }
+#endif
+
     glm::vec3 direction;
     direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
     direction.y = std::sin(glm::radians(m_pitch));

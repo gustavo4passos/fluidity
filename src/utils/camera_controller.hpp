@@ -1,5 +1,6 @@
 #pragma once
-#include "camera.hpp"
+#include "utils/camera.hpp"
+#include "input/game_controller.hpp"
 #include <SDL2/SDL.h>
 
 namespace fluidity
@@ -19,6 +20,9 @@ namespace fluidity
 
   private:
     void ProcessMouse();
+    // Assures pitches between -89 and 89 degrees
+    void SetPitch(float pitch);
+    
     Camera m_camera;
     float m_speed;
 
@@ -28,5 +32,7 @@ namespace fluidity
     float m_pitch;
 
     glm::vec3 m_movingOnAxis;
+
+    GameController m_gameController;
   };
 }

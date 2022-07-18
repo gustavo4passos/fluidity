@@ -80,6 +80,7 @@ int main(int argc, char* args[])
 
     bool running = true;
     bool playing = true;
+    bool showGui = true;
     int currentFrame = 0;
 
     SDL_CaptureMouse(SDL_TRUE);
@@ -109,6 +110,12 @@ int main(int argc, char* args[])
                         playing = !playing;
                     } break;
 
+                    case SDLK_i:
+                    {
+                        showGui = !showGui;
+                        break;
+                    }
+
                     default: break;
                 }
             }
@@ -119,8 +126,7 @@ int main(int argc, char* args[])
         renderer->SetVAO(f.GetFrameVao(currentFrame));
         renderer->Update();
         renderer->Render();
-        gui.Render();
-
+        if (showGui) gui.Render();
         if (playing) currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();
 
         window.Swap();

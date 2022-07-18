@@ -48,15 +48,6 @@ void MeshesPass::Render()
     float minusInfinity = -1000000.f;
     GLCall(glClearBufferfv(GL_COLOR, 1, &minusInfinity));
 
-    if (m_hasSkybox)
-    {
-        // TODO: Check if depth mask is active before changing it
-        glDepthMask(GL_FALSE);
-        if (previousRenderState.useDepthTest) glDisable(GL_DEPTH_TEST);
-        RenderSkybox();
-        if (previousRenderState.useDepthTest) glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_TRUE);
-    } 
 
     m_shader->Bind();
     BindTextures();
@@ -72,6 +63,11 @@ void MeshesPass::Render()
                 (const void*)0));
         }
     }
+
+    if (m_hasSkybox)
+    {
+        RenderSkybox(previousRenderState);
+    } 
 
     // std::vector<float> p;
     // p.resize(m_bufferWidth * m_bufferHeight);
@@ -99,12 +95,19 @@ void MeshesPass::Render()
 
 }
 
-void MeshesPass::RenderSkybox()
+void MeshesPass::RenderSkybox(const RenderState& previousRenderState)
 {
+    // Save current depth func before changing it
+    GLint previousDepthFunc;
+    glGetIntegerv(GL_DEPTH_FUNC, &previousDepthFunc);   
+    if (previousDepthFunc != GL_LEQUAL) glDepthFunc(GL_LEQUAL);
+
     m_skybBoxShader->Bind();
     GLCall(glBindVertexArray(m_skybox.GetVao()));
     GLCall(glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox.GetTextureID()));
     GLCall(glDrawArrays(GL_TRIANGLES, 0, 36));
+
+    if (previousDepthFunc != GL_LEQUAL) glDepthFunc(previousDepthFunc);
 }
 
 bool MeshesPass::SetUniformBuffer(const std::string& name, GLuint uniformBlockBinding)

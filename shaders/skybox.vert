@@ -19,4 +19,5 @@ void main()
     fTexCoords = vPos;
     mat4 viewMatrixWithoutTranslation = mat4(mat3(viewMatrix));
     gl_Position = projectionMatrix * viewMatrixWithoutTranslation * vec4(vPos, 1.0);
+    gl_Position = gl_Position.xyww;
 }

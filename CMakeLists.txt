@@ -31,7 +31,7 @@ find_package(glm CONFIG REQUIRED)
 #find_package(yaml-cpp CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
-file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp)
+file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp ./src/input/*.cpp)
 file(GLOB IMGUI_SOURCES ./external/imgui/imgui.cpp ./external/imgui/imgui_demo.cpp ./external/imgui/imgui_draw.cpp ./external/imgui/imgui_tables.cpp ./external/imgui/imgui_widgets.cpp ./external/imgui/backends/imgui_impl_sdl.cpp ./external/imgui/backends/imgui_impl_opengl3.cpp)
 
 add_executable(fluidity ${IMGUI_SOURCES} ${SOURCES})

@@ -32,7 +32,7 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
   m_transparentFluid(true),
   m_renderShadows(true),
-  m_filteringParameters({ 4, 7, 100 }),
+  m_filteringParameters({ 4, 7, 100, false }),
   m_shadowMapParameters({ 0.001, 0.01, 0.5, true }),
   m_fluidRenderingParameters({ 0.25 })
   { /* */ }
@@ -145,12 +145,12 @@ auto FluidRenderer::Init() -> bool
     auto& meshesRenderState = m_meshesPass->GetRenderState();
     meshesRenderState.clearColor = { 206.f / 255.f, 96.f / 255.f, 44.f / 255.f, 1.f };
     Model canyon("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
-    canyon.Load(); // Smooth normals
+    canyon.Load(true); // Smooth normals
     m_meshesPass->AddModel(canyon);
     m_meshesShadowPass->AddModel(canyon);
 
     // Skybox
-    Skybox skybox("C:\\dev\\assets\\skyboxes\\canyon");
+    Skybox skybox("C:\\dev\\assets\\skyboxes\\canyon-cloudy");
     if (skybox.Init())
     {
       m_meshesPass->AddSkybox(skybox);
@@ -427,6 +427,8 @@ void FluidRenderer::SetUpPerFrameUniforms()
     narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
     narrowFilterShader.Unbind();
   }
+
+  m_textureRenderer->SetGammaCorrectionEnabled(m_filteringParameters.gammaCorrection);
 }
 
 

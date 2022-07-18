@@ -18,6 +18,7 @@ public:
     auto Render() -> void override;
 
     auto SetTexture(GLuint texture) { m_currentTexture = texture; }
+    auto SetGammaCorrectionEnabled(bool status) -> void;
 
 private:
     Shader *m_textureShader;
