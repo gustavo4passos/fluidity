@@ -109,7 +109,16 @@ void GuiLayer::Render()
     {
         auto& fluidRenderingParameters = m_fluidRenderer->m_fluidRenderingParameters;
         ImGui::DragFloat("Attenuatiuon", (float*)&fluidRenderingParameters, 0.005f, 0.f, 1.f);
-        
+        ImGui::DragFloat("Particle Radius", (float*)&m_fluidRenderer->m_pointRadius, 0.0005, 0.0001);
+
+        auto& material = m_fluidRenderer->m_fluidMaterial;
+        ImGui::Separator();
+        ImGui::Text("Material");
+        ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
+        ImGui::ColorEdit3("Ambient", (float*)&material.ambient);
+        ImGui::ColorEdit3("Specular", (float*)&material.specular);
+        ImGui::DragFloat("Shininess", (float*)&material.shininess, 0.5, 0, 1000);
+
     }
     
     ImGui::End();

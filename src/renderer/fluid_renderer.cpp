@@ -28,7 +28,6 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_windowHeight(windowHeight),
   m_aspectRatio((float) windowWidth / windowHeight),
   m_pointRadius(pointRadius),
-  m_filteringEnabled(true),
   m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
   m_transparentFluid(true),
   m_renderShadows(true),
@@ -43,6 +42,7 @@ auto FluidRenderer::Init() -> bool
 
   m_textureRenderer = new TextureRenderer();
 
+  // Init all passes
   m_particleRenderPass = new ParticleRenderPass(
       m_windowWidth,
       m_windowHeight,
@@ -105,7 +105,7 @@ auto FluidRenderer::Init() -> bool
   );
 
   m_meshesShadowPass = new MeshesPass(
-    2048,
+    2048, // Shadow map resolution 
     2048,
     "../../shaders/mesh-shadow.vert",
     "../../shaders/mesh-shadow.frag",
@@ -113,6 +113,12 @@ auto FluidRenderer::Init() -> bool
       { GL_R32F, GL_RED, GL_FLOAT }
     }
   );
+
+  // Fluid material
+  m_fluidMaterial.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
+  m_fluidMaterial.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
+  m_fluidMaterial.specular  = { .7f, .7f, .7f, 1.f };
+  m_fluidMaterial.shininess = 350;
 
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
@@ -163,7 +169,6 @@ auto FluidRenderer::Init() -> bool
   if (!InitUniformBuffers()) return false;
 
   SetUpLights();
-  SetUpMaterial();
 
   return true;
 }
@@ -186,11 +191,6 @@ auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
   {
     renderPassPair.second->SetNumVertices(n);
   }
-}
-
-auto FluidRenderer::SetFiltering(bool enabled) -> void
-{
-  m_filteringEnabled = enabled;
 }
 
 auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
@@ -277,16 +277,10 @@ auto FluidRenderer::SetUpLights() -> void
   light2.position = { 10, -20.f, -10.f, 1.f };
 }
 
-auto FluidRenderer::SetUpMaterial() -> void
+auto FluidRenderer::UploadMaterial() -> void
 {
-  Material material;
-  material.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
-  material.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
-  material.specular  = { .7f, .7f, .7f, 1.f };
-  material.shininess = 250;
-
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
-  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &material));
+  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &m_fluidMaterial));
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 
@@ -368,6 +362,7 @@ void FluidRenderer::SetUpPerFrameUniforms()
 {
   UploadCameraData();
   UploadLights();
+  UploadMaterial();
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLightMatrices));
   for (int i = 0; i < m_lights.size(); i++)
@@ -385,48 +380,39 @@ void FluidRenderer::SetUpPerFrameUniforms()
   }
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
-  // Meshes shadow pass
-  // TODO: This can be done in one pass using the messes pass? Possibly
-  // using alpha blending to generate depth
-  {
-    // If there are no lights, there's nothing to do here
-    if (m_lights.size() == 0) return;
+  auto& meshesShader = m_meshesPass->GetShader();
+  meshesShader.Bind();
+  meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
+  meshesShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
+  meshesShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
+  meshesShader.SetUniform1f("uShadowIntensity", m_shadowMapParameters.shadowIntensity);
+  meshesShader.SetUniform1i("uUsePcf", m_shadowMapParameters.usePcf ? 1 : 0);
+  meshesShader.Unbind();
 
-    // TODO: For now only one light is being used. How to handle multiple lights?
-    auto& light1 = m_lights[0];
-    // Find light matrix
-    float radius = 10.f;
-    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
-    glm::mat4 lightView = glm::lookAt(glm::vec3(light1.position.x, light1.position.y, light1.position.z),
-      glm::vec3(0), // directional light, pointing at scene origin
-      glm::vec3(0, 1.0, 0));
-    
-    glm::mat4 lightMatrix = lightProjection * lightView;
+  auto& compositionPassShader = m_compositionPass->GetShader();
+  compositionPassShader.Bind();
+  compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
+  compositionPassShader.SetUniform1i("u_HasShadow", m_renderShadows ? 1 : 0);
+  compositionPassShader.SetUniform1f("u_ShadowIntensity", m_shadowMapParameters.shadowIntensity);
+  compositionPassShader.SetUniform1f("u_AttennuationConstant", m_fluidRenderingParameters.attenuation);
+  compositionPassShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
+  compositionPassShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
+  compositionPassShader.Unbind();
 
-    auto& meshesShader = m_meshesPass->GetShader();
-    meshesShader.Bind();
-    meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
-    meshesShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
-    meshesShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
-    meshesShader.SetUniform1f("uShadowIntensity", m_shadowMapParameters.shadowIntensity);
-    meshesShader.SetUniform1i("uUsePcf", m_shadowMapParameters.usePcf ? 1 : 0);
-    meshesShader.Unbind();
+  auto& narrowFilterShader = m_filterPass->GetShader();
+  narrowFilterShader.Bind();
+  narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
+  narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
+  narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
+  narrowFilterShader.Unbind();
 
-    auto& compositionPassShader = m_compositionPass->GetShader();
-    compositionPassShader.Bind();
-    compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-    // compositionPassShader.SetUniform1i("u_HasShadow", m_renderShadows ? 1 : 0);
-    compositionPassShader.SetUniform1f("u_ShadowIntensity", m_shadowMapParameters.shadowIntensity);
-    compositionPassShader.SetUniform1f("u_AttennuationConstant", m_fluidRenderingParameters.attenuation);
-    compositionPassShader.Unbind();
+  auto& thicknessPassShader = m_thicknessPass->GetShader();
+  thicknessPassShader.Bind();
+  thicknessPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius * 1.2f);
 
-    auto& narrowFilterShader = m_filterPass->GetShader();
-    narrowFilterShader.Bind();
-    narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
-    narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
-    narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
-    narrowFilterShader.Unbind();
-  }
+  auto& depthPassShader = m_depthPass->GetShader();
+  depthPassShader.Bind();
+  depthPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius);
 
   m_textureRenderer->SetGammaCorrectionEnabled(m_filteringParameters.gammaCorrection);
 }
@@ -473,14 +459,13 @@ auto FluidRenderer::Render() -> void
   m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
   m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
   m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
+  
   glActiveTexture(GL_TEXTURE0 + 6);
   glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
   m_compositionPass->Render();
   glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-  m_textureRenderer->SetTexture(
-      m_filteringEnabled ? m_compositionPass->GetBuffer() : m_meshesShadowPass->GetBuffer()
-  );
+  m_textureRenderer->SetTexture(m_compositionPass->GetBuffer());
 
   m_textureRenderer->Render();
 }
@@ -510,17 +495,7 @@ auto FluidRenderer::UploadLights() -> void
   for (int i = 0; i < numLights; i++)
   {
     GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
-    // Upload light 1
     GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_lights[i]));
-
-    float radius = 10.f;
-    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
-    glm::mat4 lightView = glm::lookAt(glm::vec3(m_lights[i].position.x, 
-      m_lights[i].position.y, m_lights[i].position.z),
-      glm::vec3(0), // directional light, pointing at scene origin
-      glm::vec3(0, 1.0, 0));
-    
-    glm::mat4 lightMatrix = lightProjection * lightView;
   }
 
   // Upload number of lights

@@ -75,7 +75,8 @@ out vec4 outColor;
 vec3 shadeLight(int lightID, vec3 normal, vec3 fragPos, vec3 viewDir)
 {
     //    vec3 lightDir = normalize(vec3(/*viewMatrix */ lights[lightID].position) - fragPos);
-    vec3 lightDir     = normalize(vec3(viewMatrix * lights[lightID].position) - fragPos);
+    // fluidity - Makes all lights directional
+    vec3 lightDir     = normalize(vec3(viewMatrix * lights[lightID].position));
     vec3 halfDir      = normalize(lightDir - viewDir);
     vec4 surfaceColor = (u_ColorMode == COLOR_MODE_UNIFORM_MATERIAL) ? material.diffuse : vec4(f_Color, 1.0);
 

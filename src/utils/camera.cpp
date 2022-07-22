@@ -6,7 +6,7 @@ namespace fluidity
 
 Camera::Camera(const glm::vec3& position, float fov, float aspectRatio)
   : m_position(position),
-  m_front(glm::normalize(glm::vec3(-35.f, -1.f, 0.f) - position)),
+  m_front(glm::normalize(glm::vec3(-35.f, -1.f, 0.f) - position)), // TODO: This shouldn't be hardcoded
   m_fov(fov),
   m_aspectRatio(aspectRatio)
 { /* */ } 

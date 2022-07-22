@@ -132,8 +132,6 @@ namespace fluidity
 
     float sensitivity = .2f; 
     m_yaw   += mouseMove.x * sensitivity;
-    m_pitch - mouseMove.y * sensitivity;
-
     SetPitch(m_pitch - mouseMove.y * sensitivity);
   }
 

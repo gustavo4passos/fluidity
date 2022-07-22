@@ -13,31 +13,11 @@
 #include "utils/camera_controller.hpp"
 #include "renderer/texture.hpp"
 #include "renderer/model.hpp"
+#include "renderer/rendering_parameters.hpp"
 #include <unordered_map>
 
 namespace fluidity
 {
-
-struct FilteringParameters
-{
-  int nIterations;
-  int filterSize;
-  int maxFilterSize;
-  bool gammaCorrection; // TODO: This should not be here. More like "post processing parameters"
-};
-
-struct FluidRenderingParameters
-{
-  float attenuation;
-};
-
-struct ShadowMapParameters
-{
-  float minShadowBias;
-  float maxShadowBias;
-  float shadowIntensity;
-  bool  usePcf;
-};
 
 class FluidRenderer : public Renderer
 {
@@ -45,16 +25,14 @@ public:
   FluidRenderer(unsigned windowWidth, unsigned windowHeight, float pointRadius);
   FluidRenderer(const FluidRenderer&) = delete;
 
-  auto Init()  -> bool;
-  auto SetVAO(GLuint vao) -> void;
-  auto SetNumberOfParticles(unsigned n) -> void;
+  bool Init();
+  void SetVAO(GLuint vao);
+  void SetNumberOfParticles(unsigned n);
 
-  auto Update() -> void override;
-  auto Render() -> void override;
+  void Update() override;
+  void Render() override;
 
-  auto SetFiltering(bool enabled) -> void;
-  auto GetFiltering() -> bool { return m_filteringEnabled; }
-  auto ProcessInput(const SDL_Event& event) -> void;
+  void ProcessInput(const SDL_Event& event);
 
   friend class GuiLayer;
 private:
@@ -62,7 +40,7 @@ private:
   void UploadCameraData();
   void UploadLights();
   void SetUpLights();
-  void SetUpMaterial(); 
+  void UploadMaterial(); 
   void SetUpStaticUniforms();
   void SetUpPerFrameUniforms();
 
@@ -96,6 +74,7 @@ private:
   FilteringParameters m_filteringParameters;
   ShadowMapParameters m_shadowMapParameters;
   FluidRenderingParameters m_fluidRenderingParameters;
+  Material m_fluidMaterial;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;

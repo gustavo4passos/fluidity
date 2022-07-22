@@ -49,7 +49,7 @@ out vec3 fNormal;
 
 void main()
 {
-    gl_Position = projectionMatrix * viewMatrix * vec4(vPos - vec3(0, 0.3, 0), 1.0);
+    gl_Position = projectionMatrix * viewMatrix * vec4(vPos, 1.0);
     fNormal = vNormal;  
     fFragPos = vPos;
     fFragPosLightSpace = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * vec4(vPos, 1.0);

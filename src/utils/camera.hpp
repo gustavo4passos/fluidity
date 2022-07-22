@@ -8,19 +8,20 @@ namespace fluidity
   class Camera
   {
   public:
-    Camera(const glm::vec3& position, float fov = 15, float aspectRatio = 16.f / 9.f); 
+    Camera(const glm::vec3& position = {}, float fov = 15, float aspectRatio = 16.f / 9.f); 
+    Camera(const Camera&) = default;
   
     const glm::mat4 GetProjectionMatrix();
     const glm::mat4 GetViewMatrix();
 
-    const glm::vec3& GetPosition() { return m_position; }
+    glm::vec3 GetPosition() const { return m_position; }
     void SetPosition(const glm::vec3& position) { m_position = position; }
 
     const glm::vec3& GetFront() { return m_front; } 
     void SetFront(const glm::vec3& front) { m_front = front; }
     // TODO: This should be configurable
 
-    const float GetFOV() { return m_fov; };
+    const float GetFOV() const { return m_fov; };
     void SetFOV(float fov) { m_fov = fov; }
     
     static constexpr float NEAR_PLANE = 0.1f;

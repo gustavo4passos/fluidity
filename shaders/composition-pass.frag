@@ -90,7 +90,11 @@ uniform float u_ReflectionConstant;
 uniform float u_AttennuationConstant;
 uniform int   u_TransparentFluid;
 
-// int/out
+// fluidity
+uniform float uMinShadowBias;
+uniform float uMaxShadowBias;
+
+// in/out
 in vec2  f_TexCoord;
 out vec4 fragColor;
 
@@ -146,6 +150,7 @@ vec3 computeAttennuation(float thickness)
     return vec3(exp(-k_r * thickness), exp(-k_g * thickness), exp(-k_b * thickness));
 }
 
+
 const int lightID = 0;
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 void main()
@@ -183,7 +188,8 @@ void main()
     vec3 position = uvToEye(f_TexCoord, eyeDepth);
     vec3 viewer   = normalize(-position.xyz);
 
-    vec3  lightDir = normalize(vec3(viewMatrix * lights[lightID].position) - position);
+    // fluidity - Makes all lights directional 
+    vec3  lightDir = normalize(vec3(viewMatrix * lights[lightID].position));
     vec3  H        = normalize(lightDir + viewer);
     float specular = pow(max(0.0f, dot(H, N)), material.shininess);
     float diffuse  = max(0.0f, dot(lightDir, N)) * 1.0f;
@@ -202,21 +208,25 @@ void main()
         float inSolidShadow     = 0.0;
 
         vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-        projCoords = projCoords * 0.5 + 0.5;         // Transform to [0,1] range
+        float depth = projCoords.z;
+        projCoords = projCoords * 0.5 + 0.5; // Transform to [0,1] range
         vec2 shadowTexCoord = clamp(projCoords.xy, 0.0, 1.0);
         vec2 texelSize      = 1.0 / textureSize(u_SolidShadowMaps[lightID], 0);
         for(int x = -1; x <= 1; ++x) {
             for(int y = -1; y <= 1; ++y) {
-                float sampleSolidDepth = texture(u_SolidShadowMaps[lightID], shadowTexCoord + vec2(x, y) * texelSize).r;
-                inSolidShadow += (lightCoord.z < sampleSolidDepth + SHADOW_BIAS) ? 1.0 : 0.0;
+                float shadowBias = max(uMaxShadowBias * (1 - dot(N, lightDir)), uMinShadowBias);
+                float closestDepth = texture(u_SolidShadowMaps[lightID], shadowTexCoord + vec2(x, y) * texelSize).r;
+                inSolidShadow += depth - shadowBias > closestDepth ? 1.0 : 0.0;
             }
         }
         inSolidShadow /= 9.0;
+        inSolidShadow *= u_ShadowIntensity;
 
         float sampleFluidDepth     = texture(u_FluidShadowMaps[lightID], shadowTexCoord).r;
         float inFluidShadow        = (lightCoord.z < sampleFluidDepth + SHADOW_BIAS) ? 1.0 : 0.0;
         float fluidShadowThickness = texture(u_FluidShadowThickness[lightID], shadowTexCoord).r;
 
+        inFluidShadow = 0; // TODO: Remove me
         vec3 fluidShadowColor = inFluidShadow > 0 ? computeAttennuation(u_ShadowIntensity * fluidShadowThickness * 0.2f) : vec3(1.0);
         shadowColor = (1.0 - u_ShadowIntensity * inSolidShadow) * fluidShadowColor;
 
