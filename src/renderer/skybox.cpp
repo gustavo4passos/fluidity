@@ -15,8 +15,8 @@ Skybox::Skybox(const std::string& folderPath)
 
 bool Skybox::Init()
 {
-    glGenTextures(1, &m_id);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, m_id);
+    GLCall(glGenTextures(1, &m_id));
+    GLCall(glBindTexture(GL_TEXTURE_CUBE_MAP, m_id));
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -51,6 +51,8 @@ bool Skybox::Init()
 
         GLCall(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, 
             width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
+        
+        free(data);
     }
 
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
@@ -118,7 +120,11 @@ bool Skybox::Init()
 
 bool Skybox::CleanUp()
 {
+    // TODO: Should all be unbind before cleaning up? Or should it be the caller's r
+    // responsibility?
     glDeleteTextures(1, &m_id);
+    glDeleteBuffers(1, &m_vbo);
+    glDeleteVertexArrays(1, &m_vao);
     return true;
 }
 

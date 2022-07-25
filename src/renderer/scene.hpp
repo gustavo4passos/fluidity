@@ -11,12 +11,13 @@ namespace fluidity
 struct Scene
 {
     FilteringParameters filteringParameters;
-    FluidRenderingParameters fluidRenderingParameters;
-    ShadowMapParameters shadowParameters;
+    FluidParameters fluidParameters;
+    LightingParameters lightingParameters;
     Camera camera;
-    std::vector<PointLight> lights;
-    std::vector<std::string> modelsPaths;
-    std::string skyboxPath;
+    Material fluidMaterial;
+    std::vector<PointLight> lights = {};
+    std::vector<std::string> modelsPaths = {};
+    std::string skyboxPath = "";
 };
 
 
@@ -24,9 +25,12 @@ class SceneSerializer
 {
 public:
     SceneSerializer(const std::string& filePath);
-    SceneSerializer(Scene* scene, const std::string& filePath);
-    void Deserialize();
+    SceneSerializer(Scene scene, const std::string& filePath);
+    
+    bool Deserialize();
     void Serialize();
+    void SetScene(const Scene& scene) { m_scene = scene; }
+    const Scene& GetScene() { return m_scene; }
 
     static constexpr char* SERIALIZER_VERSION = "1.0";
 

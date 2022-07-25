@@ -19,6 +19,7 @@ public:
 
     // Requires an active OpenGL context
     bool Init();
+    void CleanUp();
     
     GLuint GetVao() { return m_vao; }
     GLuint GetIbo() { return m_ibo; }

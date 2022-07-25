@@ -14,11 +14,11 @@ set(BUILD_SHARED_LIBS off)
 add_subdirectory(./external/cnpy)
 
 # External submodule - yaml-cpp
-set(YAML_CPP_BUILD_TESTS   off)
-set(YAML_CPP_BUILD_CONTRIB off)
-set(YAML_CPP_BUILD_TOOLS   off)
-set(YAML_BUILD_SHARED_LIBS off)
-add_subdirectory(./external/yaml-cpp)
+# set(YAML_CPP_BUILD_TESTS   off)
+# set(YAML_CPP_BUILD_CONTRIB off)
+# set(YAML_CPP_BUILD_TOOLS   off)
+# set(YAML_BUILD_SHARED_LIBS off)
+# add_subdirectory(./external/yaml-cpp)
 
 # External submodule - assimp
 set(ASSIMP_BUILD_TESTS          off)
@@ -31,13 +31,13 @@ include_directories(./external/cnpy/)
 include_directories(./external/assimp/include)
 include_directories(./external/imgui/backends)
 include_directories(./external/imgui)
-include_directories(./external/yaml-cpp/include)
+# include_directories(./external/yaml-cpp/include)
 
 find_package(SDL2 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
-#find_package(yaml-cpp CONFIG REQUIRED)
+find_package(yaml-cpp CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
 file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp ./src/input/*.cpp)

@@ -27,13 +27,7 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_windowWidth(windowWidth),
   m_windowHeight(windowHeight),
   m_aspectRatio((float) windowWidth / windowHeight),
-  m_pointRadius(pointRadius),
-  m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
-  m_transparentFluid(true),
-  m_renderShadows(true),
-  m_filteringParameters({ 4, 7, 100, false }),
-  m_shadowMapParameters({ 0.001, 0.01, 0.5, true }),
-  m_fluidRenderingParameters({ 0.25 })
+  m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f))
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -47,7 +41,7 @@ auto FluidRenderer::Init() -> bool
       m_windowWidth,
       m_windowHeight,
       m_currentNumberOfParticles,
-      m_pointRadius,
+      0.06250,
       m_currentVAO
   );
 
@@ -114,12 +108,6 @@ auto FluidRenderer::Init() -> bool
     }
   );
 
-  // Fluid material
-  m_fluidMaterial.ambient   = { 0.1f, 0.1f, 0.1f, 1.f };
-  m_fluidMaterial.diffuse   = { 0.5f, 0.5f, 0.9f, 1.f };
-  m_fluidMaterial.specular  = { .7f, .7f, .7f, 1.f };
-  m_fluidMaterial.shininess = 350;
-
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
   m_renderPasses["FilterPass"]         = m_filterPass;
@@ -144,31 +132,79 @@ auto FluidRenderer::Init() -> bool
     return false;  
   }
 
-  SetUpStaticUniforms();
-
+  // Thickness pass -> Setup
+  {
+    auto renderState = m_thicknessPass->GetRenderState();
+    renderState.useBlend                = true;
+    renderState.useDepthTest            = false;
+    renderState.blendSourceFactor       = GL_ONE;
+    renderState.blendDestinationFactor  = GL_ONE;
+    renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 1.f };
+    m_thicknessPass->SetRenderState(renderState);
+  }
   // Meshes pass -> Setup
   {
     auto& meshesRenderState = m_meshesPass->GetRenderState();
     meshesRenderState.clearColor = { 206.f / 255.f, 96.f / 255.f, 44.f / 255.f, 1.f };
-    Model canyon("C:\\dev\\FluidSimulationFiles\\Canyon\\canyon_boundary.obj");
-    canyon.Load(true); // Smooth normals
-    m_meshesPass->AddModel(canyon);
-    m_meshesShadowPass->AddModel(canyon);
-
-    // Skybox
-    Skybox skybox("C:\\dev\\assets\\skyboxes\\canyon-cloudy");
-    if (skybox.Init())
-    {
-      m_meshesPass->AddSkybox(skybox);
-    }
-
     auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
     meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
   }
 
+  if (!LoadScene()) return false;
   if (!InitUniformBuffers()) return false;
 
-  SetUpLights();
+  return true;
+}
+
+bool FluidRenderer::LoadScene()
+{
+  m_meshesPass->RemoveModels();
+  m_meshesShadowPass->RemoveModels();
+  
+  for (const auto& mPath : m_scene.modelsPaths)
+  {
+    Model m(mPath, true);
+    if (!m.Load())
+    {
+      LOG_ERROR("Unable to load model " + mPath);
+      m_meshesPass->RemoveModels();
+      m_meshesShadowPass->RemoveModels();
+      return false;
+    }
+    m_meshesPass->AddModel(m);
+    m_meshesShadowPass->AddModel(m);
+  }
+
+  if (m_scene.skyboxPath != "")
+  {
+    Skybox skybox(m_scene.skyboxPath);
+    if (skybox.Init())
+    {
+      m_meshesPass->RemoveSkybox();
+      m_meshesPass->AddSkybox(skybox);
+    }
+    else
+    {
+      LOG_ERROR("Unable to load skybox " + m_scene.skyboxPath);
+      return false;
+    }
+  }
+
+  // If there are no lights in the scene, create a default one
+  if (m_scene.lights.empty())
+  {
+    PointLight light;
+    light.ambient  = { .2f, .2f, .2f, .2f };
+    light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
+    light.specular = { 1.f, 1.f, 1.f, 1.f };
+    light.position = { -16, 24.f, 7.5f, 1.f };
+
+    m_scene.lights.push_back(light);
+  }
+
+  m_cameraController.SetCamera(m_scene.camera);
+
+  SetUpStaticUniforms();
 
   return true;
 }
@@ -254,45 +290,30 @@ auto FluidRenderer::InitUniformBuffers() -> bool
     {
       LOG_ERROR("Unable to set Material uniform buffer on " + renderPassPair.first);
     }
-  }
-
-  return true;
 }
 
-auto FluidRenderer::SetUpLights() -> void
-{
-  PointLight light;
-  light.ambient  = { .2f, .2f, .2f, .2f };
-  light.diffuse  = { 1.f, 1.f, 1.f, 1.f };
-  light.specular = { 1.f, 1.f, 1.f, 1.f };
-
-  light.position = { -16, 24.f, 7.5f, 1.f };
-
-  m_lights.push_back(light);
-
-  PointLight light2;
-  light2.ambient  = { .1f, .1f, .1f, 1.f };
-  light2.diffuse  = { .3f, .3f, .3f, 1.f };
-  light2.specular = { 1.f, 1.f, 1.f, 1.f };
-  light2.position = { 10, -20.f, -10.f, 1.f };
+  return true;
 }
 
 auto FluidRenderer::UploadMaterial() -> void
 {
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
-  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &m_fluidMaterial));
+  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &m_scene.fluidMaterial));
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 
 auto FluidRenderer::SetUpStaticUniforms() -> void
 {
+  auto& fluidParameters     = m_scene.fluidParameters;
+  auto& filteringParameters = m_scene.filteringParameters;
+
   // TODO: Maybe these passes should be serialized, or initialized in another class?
   // Depth pass -> Init uniforms
   {
     auto& depthPassShader = m_depthPass->GetShader();
     depthPassShader.Bind();
     depthPassShader.SetUniform1i("u_UseAnisotropyKernel", 0);
-    depthPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius);
+    depthPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
     depthPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     depthPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     depthPassShader.Unbind(); 
@@ -300,18 +321,10 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
 
   // Thickness pass -> Init uniforms, set up render state
   {
-    auto renderState = m_thicknessPass->GetRenderState();
-    renderState.useBlend                = true;
-    renderState.useDepthTest            = false;
-    renderState.blendSourceFactor       = GL_ONE;
-    renderState.blendDestinationFactor  = GL_ONE;
-    renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 1.f };
-    m_thicknessPass->SetRenderState(renderState);
 
     auto& thicknessPassShader = m_thicknessPass->GetShader();
     thicknessPassShader.Bind();
-    thicknessPassShader.SetUniform1i("u_UseAnisotropyKernel", 0);
-    thicknessPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius * 1.2f);
+    thicknessPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius * 1.2f);
     thicknessPassShader.SetUniform1f("u_PointScale", 
       (float)m_windowHeight / std::tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
     thicknessPassShader.SetUniform1i("u_HasSolid", 0);
@@ -325,9 +338,9 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     narrowFilterShader.SetUniform1i("u_DoFilter1D", 0);
     narrowFilterShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     narrowFilterShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
-    narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
-    narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
-    narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
+    narrowFilterShader.SetUniform1i("u_FilterSize", filteringParameters.filterSize);
+    narrowFilterShader.SetUniform1i("u_MaxFilterSize", filteringParameters.maxFilterSize);
+    narrowFilterShader.SetUniform1f("u_ParticleRadius", fluidParameters.pointRadius);
     narrowFilterShader.Unbind();
   }
 
@@ -352,7 +365,7 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     compositionPassShader.SetUniform1i("u_SolidDepthMap",       4);
     compositionPassShader.SetUniform1i("u_SolidShadowMaps[0]",  5);
     compositionPassShader.SetUniform1i("u_SkyBoxTex",           6);
-    compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
+    compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
     compositionPassShader.Unbind();
   }
@@ -360,14 +373,18 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
 
 void FluidRenderer::SetUpPerFrameUniforms()
 {
+  auto& fluidParameters     = m_scene.fluidParameters;
+  auto& filteringParameters = m_scene.filteringParameters;
+  auto& lightingParameters  = m_scene.lightingParameters;
+
   UploadCameraData();
   UploadLights();
   UploadMaterial();
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLightMatrices));
-  for (int i = 0; i < m_lights.size(); i++)
+  for (int i = 0; i < m_scene.lights.size(); i++)
   {
-    auto& l = m_lights[i];
+    auto& l = m_scene.lights[i];
     float radius = 10.f;
     glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
     // Find light matrix
@@ -382,39 +399,39 @@ void FluidRenderer::SetUpPerFrameUniforms()
 
   auto& meshesShader = m_meshesPass->GetShader();
   meshesShader.Bind();
-  meshesShader.SetUniform1i("uHasShadows", m_renderShadows ? 1 : 0);
-  meshesShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
-  meshesShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
-  meshesShader.SetUniform1f("uShadowIntensity", m_shadowMapParameters.shadowIntensity);
-  meshesShader.SetUniform1i("uUsePcf", m_shadowMapParameters.usePcf ? 1 : 0);
+  meshesShader.SetUniform1i("uHasShadows", lightingParameters.renderShadows ? 1 : 0);
+  meshesShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
+  meshesShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
+  meshesShader.SetUniform1f("uShadowIntensity", lightingParameters.shadowIntensity);
+  meshesShader.SetUniform1i("uUsePcf", lightingParameters.usePcf ? 1 : 0);
   meshesShader.Unbind();
 
   auto& compositionPassShader = m_compositionPass->GetShader();
   compositionPassShader.Bind();
-  compositionPassShader.SetUniform1i("u_TransparentFluid", m_transparentFluid ? 1 : 0);
-  compositionPassShader.SetUniform1i("u_HasShadow", m_renderShadows ? 1 : 0);
-  compositionPassShader.SetUniform1f("u_ShadowIntensity", m_shadowMapParameters.shadowIntensity);
-  compositionPassShader.SetUniform1f("u_AttennuationConstant", m_fluidRenderingParameters.attenuation);
-  compositionPassShader.SetUniform1f("uMinShadowBias", m_shadowMapParameters.minShadowBias);
-  compositionPassShader.SetUniform1f("uMaxShadowBias", m_shadowMapParameters.maxShadowBias);
+  compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
+  compositionPassShader.SetUniform1i("u_HasShadow", lightingParameters.renderShadows ? 1 : 0);
+  compositionPassShader.SetUniform1f("u_ShadowIntensity", lightingParameters.shadowIntensity);
+  compositionPassShader.SetUniform1f("u_AttennuationConstant", fluidParameters.attenuation);
+  compositionPassShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
+  compositionPassShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
   narrowFilterShader.Bind();
-  narrowFilterShader.SetUniform1i("u_FilterSize", m_filteringParameters.filterSize);
-  narrowFilterShader.SetUniform1i("u_MaxFilterSize", m_filteringParameters.maxFilterSize);
-  narrowFilterShader.SetUniform1f("u_ParticleRadius", m_pointRadius);
+  narrowFilterShader.SetUniform1i("u_FilterSize", filteringParameters.filterSize);
+  narrowFilterShader.SetUniform1i("u_MaxFilterSize", filteringParameters.maxFilterSize);
+  narrowFilterShader.SetUniform1f("u_ParticleRadius", fluidParameters.pointRadius);
   narrowFilterShader.Unbind();
 
   auto& thicknessPassShader = m_thicknessPass->GetShader();
   thicknessPassShader.Bind();
-  thicknessPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius * 1.2f);
+  thicknessPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius * 1.2f);
 
   auto& depthPassShader = m_depthPass->GetShader();
   depthPassShader.Bind();
-  depthPassShader.SetUniform1f("u_PointRadius", (float)m_pointRadius);
+  depthPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
 
-  m_textureRenderer->SetGammaCorrectionEnabled(m_filteringParameters.gammaCorrection);
+  m_textureRenderer->SetGammaCorrectionEnabled(filteringParameters.gammaCorrection);
 }
 
 
@@ -425,13 +442,14 @@ auto FluidRenderer::Update() -> void
 
 auto FluidRenderer::Render() -> void
 {
+  
   SetUpPerFrameUniforms();
 
   // m_particleRenderPass->Render();
   m_depthPass->Render();
   m_thicknessPass->Render();
 
-  if (m_renderShadows)
+  if (m_scene.lightingParameters.renderShadows)
   {
     m_meshesShadowPass->Render();
     m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
@@ -439,14 +457,14 @@ auto FluidRenderer::Render() -> void
 
   m_meshesPass->Render();
   
-  for (int i = 0; i < m_filteringParameters.nIterations; i++)
+  for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
   {
     if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
     else m_filterPass->SwapBuffers();
     m_filterPass->Render();
   }
 
-  const auto& depthTexture = m_filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
+  const auto& depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
     m_depthPass->GetBuffer();
 
   m_normalPass->SetInputTexture(depthTexture);
@@ -489,13 +507,13 @@ auto FluidRenderer::UploadCameraData() -> void
 
 auto FluidRenderer::UploadLights() -> void
 {
-  int numLights = m_lights.size();
+  int numLights = m_scene.lights.size();
   constexpr int numLightsFieldOffset = sizeof(PointLight) * NUM_TOTAL_LIGHTS;
 
   for (int i = 0; i < numLights; i++)
   {
     GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLights));
-    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_lights[i]));
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(PointLight) * i, sizeof(PointLight), &m_scene.lights[i]));
   }
 
   // Upload number of lights

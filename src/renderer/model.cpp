@@ -5,23 +5,25 @@
 #include <assimp/postprocess.h>
 #include <cassert>
 
-Model::Model(const std::string& filePath)
-    : m_filePath(filePath)
+Model::Model(const std::string& filePath, bool genSmoothNormals)
+    : m_filePath(filePath),
+    m_genSmoothNormals(genSmoothNormals)
 { /* */ }
 
-bool Model::Load(bool genSmoothNormals)
+bool Model::Load()
 {
     Assimp::Importer importer;
-    if (genSmoothNormals) importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, 
+    if (m_genSmoothNormals) importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, 
         aiComponent_NORMALS);
 
     const aiScene* scene = importer.ReadFile(m_filePath, aiProcess_Triangulate | aiProcess_FlipUVs | 
-        (genSmoothNormals ? (aiProcess_RemoveComponent | aiProcess_GenSmoothNormals) : 0) |
+        (m_genSmoothNormals ? (aiProcess_RemoveComponent | aiProcess_GenSmoothNormals) : 0) |
         aiProcess_CalcTangentSpace);
     
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
     {
         LOG_ERROR("Unable to load model: [" + m_filePath + "] " + std::string(importer.GetErrorString()));
+        return false;
     }
 
 
@@ -67,4 +69,14 @@ bool Model::Load(bool genSmoothNormals)
     }
 
     return true;
+}
+
+void Model::CleanUp()
+{
+    for (auto& mesh : m_meshes)
+    {
+        mesh.CleanUp();
+    }
+
+    m_meshes.clear();
 }

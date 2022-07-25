@@ -9,7 +9,8 @@ namespace fluidity
   {
   public:
     CameraController(const Camera& camera);
-    Camera& GetCamera() { return m_camera; } 
+    Camera& GetCamera() { return m_camera; }
+    void SetCamera(const Camera& camera) { m_camera = camera; }
 
     void ProcessInput(const SDL_Event& e);
     void Update();

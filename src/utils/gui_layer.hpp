@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include "renderer/scene.hpp"
 
 namespace fluidity
 {
@@ -15,9 +16,14 @@ public:
     void Render();
 
 private:
+    void GuiLayer::RenderPerformanceOverlay();
+
+    bool m_showPerformanceOverlay;
+
     SDL_Window* m_window;
     void* m_glContext;
     FluidRenderer* m_fluidRenderer;
+    SceneSerializer m_sceneSerializer;
 };
 
 }

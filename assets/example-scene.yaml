@@ -1,0 +1,20 @@
+Version: 1.0
+FilteringParameters: [4, 7, 100, false, false]
+FluidParameters: [0.25, true, 0.0625]
+LightingParameters: [0.00100000005, 0.00999999978, 0.5, true, true]
+FluidMaterial:
+  ambient: [0.100000001, 0.100000001, 0.100000001, 1]
+  diffuse: [0.5, 0.5, 0.899999976, 1]
+  specular: [0.699999988, 0.699999988, 0.699999988, 1]
+  shininess: 350
+Lights:
+  - ambient: [0.200000003, 0.200000003, 0.200000003, 0.200000003]
+    diffuse: [1, 1, 1, 1]
+    specular: [1, 1, 1, 1]
+    position: [-16, 24, 7.5, 1]
+Models:
+  - C:\dev\FluidSimulationFiles\Canyon\canyon_boundary.obj
+Camera:
+  position: [17, 8, 0.5]
+  fov: 45
+Skybox: C:\dev\assets\skyboxes\canyon-cloudy

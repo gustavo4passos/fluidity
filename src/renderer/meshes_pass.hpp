@@ -24,6 +24,10 @@ public:
 
   void AddModel(const Model& model) { m_models.push_back(model); };
   void AddSkybox(const Skybox& skybox);
+  std::vector<Model>& GetModels() { return m_models; }
+  bool HasSkybox() { return m_hasSkybox; }
+  void RemoveSkybox();
+  void RemoveModels();
 
   Skybox& GetSkybox();
 

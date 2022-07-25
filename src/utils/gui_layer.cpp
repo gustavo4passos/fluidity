@@ -8,7 +8,9 @@ namespace fluidity
 GuiLayer::GuiLayer(SDL_Window* window, void* glContext, FluidRenderer* fluidRenderer)
     : m_window(window),
     m_glContext(glContext),
-    m_fluidRenderer(fluidRenderer)
+    m_fluidRenderer(fluidRenderer),
+    m_showPerformanceOverlay(true),
+    m_sceneSerializer("./defaults.yaml")
 { /* */ }
 
 bool GuiLayer::Init()
@@ -41,38 +43,53 @@ void GuiLayer::Render()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
-    // static bool showDemoWindow = true;
-    // ImGui::ShowDemoWindow(&showDemoWindow);
+    static bool showDemoWindow = true;
+    ImGui::ShowDemoWindow(&showDemoWindow);
 
+    RenderPerformanceOverlay();
     ImGui::Begin("Parameters");
 
     if (ImGui::CollapsingHeader("Lighting"))
     {
-        auto& light = m_fluidRenderer->m_lights[0];
+        auto& light = m_fluidRenderer->m_scene.lights[0];
         ImGui::Text("Light");
         ImGui::PushID((int)&light);
         ImGui::DragFloat3("Position", (float*)&light.position, 0.5, -100.f, 100.f);
-        ImGui::PopID();
         ImGui::ColorEdit3("Diffuse", (float*)&light.diffuse);
         ImGui::ColorEdit3("Ambient", (float*)&light.ambient);
         ImGui::ColorEdit3("Specular", (float*)&light.specular);
+        ImGui::PopID();
+
+        auto& lightingParameters = m_fluidRenderer->m_scene.lightingParameters;
         ImGui::Separator();
-        ImGui::Checkbox("Render shadows", &m_fluidRenderer->m_renderShadows);
+        ImGui::Spacing();
+        ImGui::Checkbox("Render shadows", &lightingParameters.renderShadows);
+        ImGui::SameLine();
+        ImGui::Checkbox("PCF", &lightingParameters.usePcf);
+        ImGui::Spacing();
+        ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias, 0.00001f, 0.f, 1.f);
+        ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias, 0.00001f, 0.f, 1.f);
+        ImGui::DragFloat("Shadow Intensity", &lightingParameters.shadowIntensity, 0.005f, 0.f, 1.f);
     }
 
-    if (ImGui::CollapsingHeader("Shadows"))
+    if (ImGui::CollapsingHeader("Fluid"))
     {
-        auto& shadowParameters = m_fluidRenderer->m_shadowMapParameters;
-        ImGui::DragFloat("Min Shadow Bias",  &shadowParameters.minShadowBias, 0.00001f, 0.f, 1.f);
-        ImGui::DragFloat("Max Shadow Bias",  &shadowParameters.maxShadowBias, 0.00001f, 0.f, 1.f);
-        ImGui::DragFloat("Shadow Intensity", &shadowParameters.shadowIntensity, 0.05f, 0.f, 1.f);
-        ImGui::Checkbox("PCF", &shadowParameters.usePcf);
-    }
+        auto& fluidParameters     = m_fluidRenderer->m_scene.fluidParameters;
+        auto& material            = m_fluidRenderer->m_scene.fluidMaterial;
+        auto& filteringParameters = m_fluidRenderer->m_scene.filteringParameters;
 
-    if (ImGui::CollapsingHeader("Filtering"))
-    {
-        ImGui::Checkbox("Transparent", &m_fluidRenderer->m_transparentFluid);
-        auto& filteringParameters = m_fluidRenderer->m_filteringParameters;
+        ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
+        ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0005, 0.0001);
+
+        ImGui::Separator();
+        ImGui::Text("Material");
+        ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
+        ImGui::ColorEdit3("Ambient", (float*)&material.ambient);
+        ImGui::ColorEdit3("Specular", (float*)&material.specular);
+        ImGui::DragFloat("Shininess", (float*)&material.shininess, 0.5, 0, 1000);
+        
+        ImGui::Separator();
+        ImGui::Checkbox("Transparent", &fluidParameters.transparentFluid);
         ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
         ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
         ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
@@ -83,6 +100,62 @@ void GuiLayer::Render()
     {
         auto& renderState = m_fluidRenderer->m_meshesPass->GetRenderState();
         ImGui::ColorEdit3("Background color", (float*)&renderState.clearColor);
+
+        auto meshesPass       = m_fluidRenderer->m_meshesPass;
+        auto meshesShadowPass = m_fluidRenderer->m_meshesShadowPass;
+
+        ImGui::Separator();
+        static char skyboxPath[250];
+        ImGui::InputText("Skybox", skyboxPath, 250);
+        ImGui::SameLine();
+        if (ImGui::Button("Load"))
+        {
+            Skybox s = Skybox(skyboxPath);
+            if (s.Init())
+            {
+                // TODO: The scene should provide the skybox and models automatically
+                meshesPass->AddSkybox(s);
+                m_fluidRenderer->m_scene.skyboxPath = skyboxPath;
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear"))
+        {
+            meshesPass->RemoveSkybox();
+        }
+
+        ImGui::Separator();
+        ImGui::Text("Models");
+        for (auto& model : meshesPass->GetModels())
+        {
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::Text(model.GetFilePath().c_str());
+            bool hasSmoothedNormals = model.HasSmoothNormals();
+            ImGui::PushID((int)&model);
+            ImGui::Checkbox("Smooth Normals", &hasSmoothedNormals);
+            if (hasSmoothedNormals != model.HasSmoothNormals())
+            {
+                model.SetHasSmoothNormals(hasSmoothedNormals);
+                model.CleanUp();
+                model.Load();
+            }
+            ImGui::PopID();
+        }
+
+        static char modelPath[250];
+        ImGui::InputText("##load-model", modelPath, 250);
+        ImGui::SameLine();
+        if (ImGui::Button("Load Model"))
+        {
+            Model m = Model(modelPath);
+            if (m.Load())
+            {
+                meshesPass->AddModel(m);
+                meshesShadowPass->AddModel(m);
+                m_fluidRenderer->m_scene.modelsPaths.push_back(modelPath);
+            }
+        }
     }
 
     if (ImGui::CollapsingHeader("Camera"))
@@ -105,25 +178,76 @@ void GuiLayer::Render()
         ImGui::DragFloat("Pitch", (float*)&pitch, 0.5, -100, 100);
     }
 
-     if (ImGui::CollapsingHeader("Fluid"))
+    if (ImGui::CollapsingHeader("Scene"))
     {
-        auto& fluidRenderingParameters = m_fluidRenderer->m_fluidRenderingParameters;
-        ImGui::DragFloat("Attenuatiuon", (float*)&fluidRenderingParameters, 0.005f, 0.f, 1.f);
-        ImGui::DragFloat("Particle Radius", (float*)&m_fluidRenderer->m_pointRadius, 0.0005, 0.0001);
+        static char exportScenePath[250];
+        ImGui::InputText("##export-scene", exportScenePath, 250);
+        ImGui::SameLine();
+        if (ImGui::Button("Export scene"))
+        {
+            Scene sc = m_fluidRenderer->m_scene;
+            sc.camera = m_fluidRenderer->m_cameraController.GetCamera();
+            SceneSerializer ss = SceneSerializer(sc, exportScenePath);
+            ss.Serialize();
+        }
 
-        auto& material = m_fluidRenderer->m_fluidMaterial;
-        ImGui::Separator();
-        ImGui::Text("Material");
-        ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
-        ImGui::ColorEdit3("Ambient", (float*)&material.ambient);
-        ImGui::ColorEdit3("Specular", (float*)&material.specular);
-        ImGui::DragFloat("Shininess", (float*)&material.shininess, 0.5, 0, 1000);
-
+        if (ImGui::Button("Load scene"))
+        {
+            SceneSerializer ss = SceneSerializer(exportScenePath);
+            if (ss.Deserialize())
+            {
+                m_fluidRenderer->SetScene(ss.GetScene());
+                m_fluidRenderer->LoadScene();
+            }
+        }
     }
-    
+
     ImGui::End();
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void GuiLayer::RenderPerformanceOverlay()
+{
+    static int corner = 0;
+    ImGuiIO& io = ImGui::GetIO();
+    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | 
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (corner != -1)
+    {
+        const float PAD = 10.0f;
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+        ImVec2 work_size = viewport->WorkSize;
+        ImVec2 window_pos, window_pos_pivot;
+        window_pos.x = (corner & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
+        window_pos.y = (corner & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
+        window_pos_pivot.x = (corner & 1) ? 1.0f : 0.0f;
+        window_pos_pivot.y = (corner & 2) ? 1.0f : 0.0f;
+        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+        window_flags |= ImGuiWindowFlags_NoMove;
+    }
+    ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+    if (ImGui::Begin("Performance Overlay", &m_showPerformanceOverlay, window_flags))
+    {
+        ImGui::Text("Performance\n" "(right-click to change position)");
+        ImGui::Separator();
+        ImGui::Text("%.1f FPS", io.Framerate);
+        ImGui::Text("%.3f ms/frame", 1000.f / io.Framerate);
+
+        if (ImGui::BeginPopupContextWindow())
+        {
+            if (ImGui::MenuItem("Custom",       NULL, corner == -1)) corner = -1;
+            if (ImGui::MenuItem("Top-left",     NULL, corner == 0)) corner = 0;
+            if (ImGui::MenuItem("Top-right",    NULL, corner == 1)) corner = 1;
+            if (ImGui::MenuItem("Bottom-left",  NULL, corner == 2)) corner = 2;
+            if (ImGui::MenuItem("Bottom-right", NULL, corner == 3)) corner = 3;
+            if (m_showPerformanceOverlay && ImGui::MenuItem("Close")) m_showPerformanceOverlay = false;
+            ImGui::EndPopup();
+        }
+    }
+    
+    ImGui::End();
 }
 
 }

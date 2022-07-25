@@ -9,6 +9,7 @@
 
 struct CommandLineArgs 
 {
+    std::string scenePath;
     std::string npzPath;
     int frameCount;
     int firstFrame;
@@ -16,33 +17,40 @@ struct CommandLineArgs
 
 CommandLineArgs parseCommandArgs(int argc, char* args[])
 {
-    CommandLineArgs output = { "", 0, 0 };
+    CommandLineArgs output = { "", "", 0, 0 };
 
-    if (argc > 1) output.npzPath = args[1];
-    if (argc > 2) output.frameCount = std::stoi(args[2]);
-    if (argc > 3) output.firstFrame = std::stoi(args[3]);
+    if (argc > 1) output.scenePath = args[1];
+    if (argc > 2) output.npzPath = args[2];
+    if (argc > 3) output.frameCount = std::stoi(args[3]);
+    if (argc > 4) output.firstFrame = std::stoi(args[4]);
 
     return output;
 }
 
 void printUsage()
 {
-    std::cout << "Usage: $ npz-rendering npz_path frame_count [first_frame]\n";
+    std::cout << "Usage: $ npz-rendering scene_path npz_path frame_count [first_frame]\n";
 }
 
 int validateCommandLineArguments(const CommandLineArgs& cmdArgs)
 {
+    if (cmdArgs.scenePath.empty())
+    {
+        std::cerr << "Error: Missing scene path.\n";
+        printUsage();
+        return 1;
+    }
     if (cmdArgs.npzPath.empty())
     {
         std::cerr << "Error: Missing npz folder.\n";
         printUsage();
-        return 1;
+        return 2;
     }
     if (cmdArgs.frameCount == 0)
     {
         std::cout << "Error: frame count missing or 0.\n";
         printUsage();
-        return 2;
+        return 3;
     }
 
     return 0;
@@ -58,7 +66,6 @@ int main(int argc, char* args[])
     const unsigned int WINDOW_HEIGHT = 768;
 
     Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false);
-    fluidity::FluidRenderer* renderer;
 
     if(!window.Init()) 
     {
@@ -67,7 +74,13 @@ int main(int argc, char* args[])
     }
     else LOG_WARNING("Window successfully created.");
 
+    fluidity::FluidRenderer* renderer;
     renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0.06250);
+
+    fluidity::SceneSerializer ss(cmdLineArgs.scenePath);
+    ss.Deserialize();
+    std::cout << ss.GetScene().skyboxPath;
+    renderer->SetScene(ss.GetScene());
 
     if(!renderer->Init())
     {
@@ -93,9 +106,10 @@ int main(int argc, char* args[])
 
         while(SDL_PollEvent(&e)) 
         {
+            if(e.type == SDL_QUIT) running = false;
+            
             if (gui.ProcessEvent(e)) continue;
 
-            if(e.type == SDL_QUIT) running = false;
             if(e.type == SDL_KEYUP)
             {
                 switch(e.key.keysym.sym)

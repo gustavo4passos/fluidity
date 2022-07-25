@@ -125,11 +125,26 @@ void MeshesPass::AddSkybox(const Skybox& skybox)
     m_skybox = skybox;
 }
 
+void MeshesPass::RemoveSkybox()
+{
+    if (m_hasSkybox) m_skybox.CleanUp();
+    m_hasSkybox = false;
+}
+
+void MeshesPass::RemoveModels()
+{
+    for (auto& m : m_models)
+    {
+        m.CleanUp();
+    }
+
+    m_models.clear();
+}
+
 Skybox& MeshesPass::GetSkybox()
 {
     assert(m_hasSkybox);
     return m_skybox;
 }
-
 
 }

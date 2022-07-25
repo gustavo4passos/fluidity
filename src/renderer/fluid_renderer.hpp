@@ -1,19 +1,15 @@
 #pragma once
 
-#include "renderer.h"
-#include "shader.h"
-#include "fluid_surfaces_renderer.h"
-#include "surface_smoothing_pass.h"
+#include "renderer/particle_render_pass.hpp"
 #include "renderer/particle_render_pass.hpp"
 #include "renderer/particle_pass.hpp"
 #include "renderer/filter_pass.hpp"
 #include "renderer/meshes_pass.hpp"
-#include "texture_renderer.h"
+#include "renderer/texture_renderer.h"
+#include "renderer/rendering_parameters.hpp"
+#include "renderer/scene.hpp"
 #include "utils/export_directives.h"
 #include "utils/camera_controller.hpp"
-#include "renderer/texture.hpp"
-#include "renderer/model.hpp"
-#include "renderer/rendering_parameters.hpp"
 #include <unordered_map>
 
 namespace fluidity
@@ -26,6 +22,8 @@ public:
   FluidRenderer(const FluidRenderer&) = delete;
 
   bool Init();
+  bool LoadScene();
+  
   void SetVAO(GLuint vao);
   void SetNumberOfParticles(unsigned n);
 
@@ -35,11 +33,14 @@ public:
   void ProcessInput(const SDL_Event& event);
 
   friend class GuiLayer;
+
+  void SetScene(const Scene& scene) { m_scene = scene; }
+
+
 private:
   bool InitUniformBuffers();
   void UploadCameraData();
   void UploadLights();
-  void SetUpLights();
   void UploadMaterial(); 
   void SetUpStaticUniforms();
   void SetUpPerFrameUniforms();
@@ -62,7 +63,6 @@ private:
 
   // Useful for performing operations that affect every render pass
   std::unordered_map<std::string, RenderPass*> m_renderPasses;
-  std::vector<PointLight>  m_lights;
   std::vector<LightMatrix> m_lightMatrices;
   
   GLuint m_uniformBufferCameraData;
@@ -71,20 +71,13 @@ private:
   GLuint m_uniformBufferMaterial;
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
-  FilteringParameters m_filteringParameters;
-  ShadowMapParameters m_shadowMapParameters;
-  FluidRenderingParameters m_fluidRenderingParameters;
-  Material m_fluidMaterial;
+  Scene m_scene;
 
   unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;
   unsigned m_windowHeight;
 
   float m_aspectRatio;
-  float m_pointRadius;
-
-  bool m_filteringEnabled;
-  bool m_renderShadows;
-  bool m_transparentFluid;
 };
+
 }

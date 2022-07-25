@@ -33,3 +33,10 @@ bool Mesh::Init()
 
     return true;
 }
+
+void Mesh::CleanUp()
+{
+    GLCall(glDeleteBuffers(1, &m_ibo));
+    GLCall(glDeleteBuffers(1, &m_vbo));
+    GLCall(glDeleteVertexArrays(1, &m_vao));
+}

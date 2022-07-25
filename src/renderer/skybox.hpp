@@ -17,6 +17,8 @@ public:
     GLuint GetTextureID() { return m_id; }
     GLuint GetVao() { return m_vao; }
 
+    const std::string& GetFolderPath() { return m_folderPath; }
+
 private:
     std::string m_folderPath;
     GLuint m_id;

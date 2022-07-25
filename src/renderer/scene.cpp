@@ -1,6 +1,129 @@
 #include "renderer/scene.hpp"
+#include "utils/logger.h"
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+
+template<>
+struct YAML::convert<fluidity::FilteringParameters>
+{
+    static bool decode(const YAML::Node& node, fluidity::FilteringParameters& fp)
+    {
+        if (!node.IsSequence() || node.size() != 5) return false;
+
+        fp.nIterations     = node[0].as<int>();
+        fp.filterSize      = node[1].as<int>();
+        fp.maxFilterSize   = node[2].as<int>();
+        fp.gammaCorrection = node[3].as<bool>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<fluidity::FluidParameters>
+{
+    static bool decode(const YAML::Node& node, fluidity::FluidParameters& fp)
+    {
+        if (!node.IsSequence() || node.size() != 3) return false;
+
+        fp.attenuation       = node[0].as<float>();
+        fp.transparentFluid  = node[1].as<bool>();
+        fp.pointRadius       = node[2].as<float>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<fluidity::LightingParameters>
+{
+    static bool decode(const YAML::Node& node, fluidity::LightingParameters& lp)
+    {
+        if (!node.IsSequence() || node.size() != 5) return false;
+
+        lp.minShadowBias    = node[0].as<float>();
+        lp.maxShadowBias    = node[1].as<float>();
+        lp.shadowIntensity  = node[2].as<float>();
+        lp.usePcf           = node[3].as<bool>();
+        lp.renderShadows    = node[4].as<bool>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<Vec4>
+{
+    static bool decode(const YAML::Node& node, Vec4& v)
+    {
+        if (!node.IsSequence() || node.size() != 4) return false;
+
+        v.x = node[0].as<float>();
+        v.y = node[1].as<float>();
+        v.z = node[2].as<float>();
+        v.w = node[3].as<float>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<vec3>
+{
+    static bool decode(const YAML::Node& node, vec3& v)
+    {
+        if (!node.IsSequence() || node.size() != 3) return false;
+
+        v.x = node[0].as<float>();
+        v.y = node[1].as<float>();
+        v.z = node[2].as<float>();
+        return true;
+    }
+};
+
+
+template<>
+struct YAML::convert<PointLight>
+{
+    static bool decode(const YAML::Node& node, PointLight& l)
+    {
+        if (!node.IsMap()) return false;
+
+        l.ambient  = node["ambient"].as<Vec4>();
+        l.diffuse  = node["diffuse"].as<Vec4>();
+        l.specular = node["specular"].as<Vec4>();
+        l.position = node["position"].as<Vec4>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<Material>
+{
+    static bool decode(const YAML::Node& node, Material& m)
+    {
+        if (!node.IsMap()) return false;
+
+        m.ambient   = node["ambient"].as<Vec4>();
+        m.diffuse   = node["diffuse"].as<Vec4>();
+        m.specular  = node["specular"].as<Vec4>();
+        m.shininess = node["shininess"].as<float>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<fluidity::Camera>
+{
+    static bool decode(const YAML::Node& node, fluidity::Camera& c)
+    {
+        if (!node.IsMap()) return false;
+
+        auto position = node["position"].as<vec3>();
+        c.SetPosition({ position.x, position.y, position.z });
+        c.SetFOV(node["fov"].as<float>());
+        return true;
+    }
+};
+
 
 namespace fluidity
 {
@@ -8,17 +131,17 @@ YAML::Emitter& operator << (YAML::Emitter& out, const FilteringParameters& filte
 {
     const FilteringParameters& fp = filteringParameters;
     out << YAML::Flow;
-    out << YAML::BeginSeq << fp.nIterations << fp.filterSize << fp.maxFilterSize << fp.gammaCorrection;
+    out << YAML::BeginSeq << fp.nIterations << fp.filterSize << fp.maxFilterSize << fp.gammaCorrection << fp.gammaCorrection;
     out << YAML::EndSeq;
 
     return out;
 }
 
-YAML::Emitter& operator << (YAML::Emitter& out, const FluidRenderingParameters& fluidRenderingParameters)
+YAML::Emitter& operator << (YAML::Emitter& out, const FluidParameters& fluidParameters)
 {
-    const FluidRenderingParameters& frp = fluidRenderingParameters;
+    const FluidParameters& fp = fluidParameters;
     out << YAML::Flow;
-    out << YAML::BeginSeq << frp.attenuation;
+    out << YAML::BeginSeq << fp.attenuation << fp.transparentFluid << fp.pointRadius;
     out << YAML::EndSeq;
 
     return out;
@@ -28,6 +151,17 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Vec4& vec)
 {
     out << YAML::Flow;
     out << YAML::BeginSeq << vec.x << vec.y << vec.z << vec.w;
+    out << YAML::EndSeq;
+
+    return out;
+}
+
+YAML::Emitter& operator << (YAML::Emitter& out, const LightingParameters& lightingParameters)
+{
+    const LightingParameters& lp = lightingParameters;
+    out << YAML::Flow;
+    out << YAML::BeginSeq << lp.minShadowBias << lp.maxShadowBias << lp.shadowIntensity 
+        << lp.usePcf << lp.renderShadows;
     out << YAML::EndSeq;
 
     return out;
@@ -45,15 +179,19 @@ YAML::Emitter& operator << (YAML::Emitter& out, const PointLight& light)
     return out;
 }
 
-YAML::Emitter& operator << (YAML::Emitter& out, const ShadowMapParameters& shadowMapParameters)
+YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
 {
-    const ShadowMapParameters& smp = shadowMapParameters;
-    out << YAML::Flow;
-    out << YAML::BeginSeq << smp.minShadowBias << smp.maxShadowBias << smp.shadowIntensity << smp.shadowIntensity;
-    out << YAML::EndSeq;
-
+    using namespace YAML;
+    out << BeginMap;
+        out << Key << "ambient"   << material.ambient;
+        out << Key << "diffuse"   << material.diffuse;
+        out << Key << "specular"  << material.specular;
+        out << Key << "shininess" << material.shininess;
+    out << EndMap;
     return out;
 }
+
+
 
 YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
 {
@@ -67,13 +205,15 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     return out;
 }
 
+
+
 SceneSerializer::SceneSerializer(const std::string& filePath)
     : m_filePath(filePath)
 { /* */ }
 
-SceneSerializer::SceneSerializer(Scene* scene, const std::string& filePath)
+SceneSerializer::SceneSerializer(Scene scene, const std::string& filePath)
     : m_filePath(filePath),
-    m_scene(*scene)
+    m_scene(scene)
 { /* */ }
 
 void SceneSerializer::Serialize()
@@ -83,8 +223,9 @@ void SceneSerializer::Serialize()
     out << BeginMap;
         out << Key << "Version" << Value << SERIALIZER_VERSION;
         out << Key << "FilteringParameters" << m_scene.filteringParameters;
-        out << Key << "FluidRenderingParameters" << m_scene.fluidRenderingParameters;
-        out << Key << "ShadowMapParameters" << m_scene.shadowParameters;
+        out << Key << "FluidParameters" << m_scene.fluidParameters;
+        out << Key << "LightingParameters" << m_scene.lightingParameters;
+        out << Key << "FluidMaterial" << m_scene.fluidMaterial;
 
         out << Key << "Lights";
         out << BeginSeq;
@@ -98,7 +239,74 @@ void SceneSerializer::Serialize()
 
     out << EndMap;
 
-    std::cout << out.c_str();
+    std::ofstream outputFile(m_filePath);
+    outputFile << out.c_str();
+}
+
+bool SceneSerializer::Deserialize()
+{
+    std::ifstream sceneFile(m_filePath);
+
+    if (!sceneFile)
+    {
+        LOG_ERROR("Unable to open stage file: " + m_filePath);
+        return false;
+    }
+    std::stringstream contentStream;
+    contentStream << sceneFile.rdbuf();
+
+    YAML::Node root = YAML::Load(contentStream.str());
+
+    Scene sc;
+    if (root["FilteringParameters"])
+    {
+        sc.filteringParameters = root["FilteringParameters"].as<FilteringParameters>();
+    }
+
+    if (root["FluidParameters"])
+    {
+        sc.fluidParameters = root["FluidParameters"].as<FluidParameters>();
+    }
+
+    if (root["LightingParameters"])
+    {
+        sc.lightingParameters = root["LightingParameters"].as<LightingParameters>();
+    }
+
+    if (root["Lights"] && root["Lights"].IsSequence())
+    {
+        for (const auto& l : root["Lights"])
+        {
+            sc.lights.push_back(l.as<PointLight>());
+        }
+    }
+
+    if (root["FluidMaterial"])
+    {
+        sc.fluidMaterial = root["FluidMaterial"].as<Material>();
+    }
+
+    if (root["Camera"])
+    {
+        sc.camera = root["Camera"].as<Camera>();
+    }
+
+    if (root["Models"] && root["Models"].IsSequence())
+    {
+        for (const auto& m : root["Models"])
+        {
+            sc.modelsPaths.push_back(m.as<std::string>());
+        }
+    }
+
+    if (root["Skybox"])
+    {
+        sc.skyboxPath = root["Skybox"].as<std::string>();
+    }
+
+    // TODO: Unecessary copy
+    m_scene = sc;
+    return true;
 }
 
 }

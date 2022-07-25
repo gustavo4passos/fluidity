@@ -11,17 +11,20 @@ struct FilteringParameters
   bool gammaCorrection; // TODO: This should not be here. More like "post processing parameters"
 };
 
-struct FluidRenderingParameters
+struct FluidParameters
 {
   float attenuation;
+  bool  transparentFluid;
+  float pointRadius;
 };
 
-struct ShadowMapParameters
+struct LightingParameters
 {
   float minShadowBias;
   float maxShadowBias;
   float shadowIntensity;
   bool  usePcf;
+  bool  renderShadows;
 };
 
 }
