@@ -16,9 +16,16 @@ public:
     void Render();
 
 private:
+    void RenderMainMenuBar();
+    void LoadNewScene();
+    void SaveScene();
+    void LoadFluid();
+
+    void GuiLayer::RenderParametersWindow();
     void GuiLayer::RenderPerformanceOverlay();
 
     bool m_showPerformanceOverlay;
+    bool m_showParametersWindow;
 
     SDL_Window* m_window;
     void* m_glContext;

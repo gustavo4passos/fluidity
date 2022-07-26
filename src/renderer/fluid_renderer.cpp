@@ -19,15 +19,14 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_particleRenderPass(nullptr),
   m_depthPass(nullptr),
   m_filterPass(nullptr),
-  m_currentVAO(0),
   m_uniformBufferCameraData(0),
   m_uniformBufferLights(0),
   m_uniformBufferMaterial(0),
-  m_currentNumberOfParticles(0),
   m_windowWidth(windowWidth),
   m_windowHeight(windowHeight),
   m_aspectRatio((float) windowWidth / windowHeight),
-  m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f))
+  m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
+  m_currentFrame(0)
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -36,20 +35,23 @@ auto FluidRenderer::Init() -> bool
 
   m_textureRenderer = new TextureRenderer();
 
+  GLuint currentVao = m_scene.fluid.GetNumberOfFrames() > 0 ? 
+    m_scene.fluid.GetFrameVao(m_currentFrame) : 0;
+
   // Init all passes
   m_particleRenderPass = new ParticleRenderPass(
       m_windowWidth,
       m_windowHeight,
-      m_currentNumberOfParticles,
+      m_scene.fluid.GetNumberOfParticles(m_currentFrame),
       0.06250,
-      m_currentVAO
+      currentVao
   );
 
   m_depthPass = new ParticlePass(
       m_windowWidth,
       m_windowHeight,
-      m_currentNumberOfParticles,
-      m_currentVAO,
+      m_scene.fluid.GetNumberOfParticles(m_currentFrame),
+      currentVao,
       { GL_R32F, GL_RED, GL_FLOAT },
       "../../shaders/depth-pass.vert",
       "../../shaders/depth-pass.frag"
@@ -58,8 +60,8 @@ auto FluidRenderer::Init() -> bool
   m_thicknessPass = new ParticlePass(
     m_windowWidth,
     m_windowHeight,
-    m_currentNumberOfParticles,
-    m_currentVAO,
+    m_scene.fluid.GetNumberOfParticles(m_currentFrame),
+    currentVao,
     { GL_R32F, GL_RED, GL_FLOAT },
     "../../shaders/thickness-pass.vert",
     "../../shaders/thickness-pass.frag"
@@ -209,23 +211,30 @@ bool FluidRenderer::LoadScene()
   return true;
 }
 
-auto FluidRenderer::SetVAO(GLuint vao) -> void
+void FluidRenderer::AdvanceFrame()
 {
-  m_currentVAO = vao;
+  int numFrames = m_scene.fluid.GetNumberOfFrames();
+  if (m_scene.fluid.GetNumberOfFrames() > 0)
+  {
+    m_currentFrame = (m_currentFrame + 1) % m_scene.fluid.GetNumberOfFrames();
+  }
+  else m_currentFrame = 0;
+}
 
+auto FluidRenderer::SetVAOS() -> void
+{
+  assert(m_scene.fluid.GetNumberOfFrames() > 0);
   for (auto& renderPassPair : m_renderPasses)
   {
-    renderPassPair.second->SetVAO(vao);
+    renderPassPair.second->SetVAO(m_scene.fluid.GetFrameVao(m_currentFrame));
   }
 }
 
-auto FluidRenderer::SetNumberOfParticles(unsigned n) -> void
+auto FluidRenderer::SetNumberOfParticles() -> void
 {
-  m_currentNumberOfParticles = n;
-
   for (auto& renderPassPair : m_renderPasses)
   {
-    renderPassPair.second->SetNumVertices(n);
+    renderPassPair.second->SetNumVertices(m_scene.fluid.GetNumberOfParticles(m_currentFrame));
   }
 }
 
@@ -442,13 +451,8 @@ auto FluidRenderer::Update() -> void
 
 auto FluidRenderer::Render() -> void
 {
-  
   SetUpPerFrameUniforms();
-
-  // m_particleRenderPass->Render();
-  m_depthPass->Render();
-  m_thicknessPass->Render();
-
+  
   if (m_scene.lightingParameters.renderShadows)
   {
     m_meshesShadowPass->Render();
@@ -456,34 +460,52 @@ auto FluidRenderer::Render() -> void
   }
 
   m_meshesPass->Render();
-  
-  for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+
+  GLuint depthTexture = 0;
+  if (m_scene.fluid.GetNumberOfFrames() > 0)
   {
-    if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
-    else m_filterPass->SwapBuffers();
-    m_filterPass->Render();
+    SetVAOS();
+    SetNumberOfParticles();
+
+    // m_particleRenderPass->Render();
+    m_depthPass->Render();
+    m_thicknessPass->Render();
+
+    for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+    {
+      if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+      else m_filterPass->SwapBuffers();
+      m_filterPass->Render();
+    }
+
+    depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
+      m_depthPass->GetBuffer();
+
+    m_normalPass->SetInputTexture(depthTexture);
+    m_normalPass->Render();
+    m_compositionPass->SetInputTexture(depthTexture, 0);
+    m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(),     1);
+    m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(),        2);
+    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
+    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
+    m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
+    
+    // TODO: This needs to be done at the render pass level
+    if (m_meshesPass->HasSkybox())
+    {
+      GLuint skyboxTextureID = m_meshesPass->GetSkybox().GetTextureID();
+      glActiveTexture(GL_TEXTURE0 + 6);
+      glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
+    }
+    m_compositionPass->Render();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    m_textureRenderer->SetTexture(m_compositionPass->GetBuffer());
   }
-
-  const auto& depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
-    m_depthPass->GetBuffer();
-
-  m_normalPass->SetInputTexture(depthTexture);
-  m_normalPass->Render();
-
-  GLuint skyboxTextureID = m_meshesPass->GetSkybox().GetTextureID();
-  m_compositionPass->SetInputTexture(depthTexture, 0);
-  m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(),     1);
-  m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(),        2);
-  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
-  m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
-  m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
-  
-  glActiveTexture(GL_TEXTURE0 + 6);
-  glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
-  m_compositionPass->Render();
-  glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-
-  m_textureRenderer->SetTexture(m_compositionPass->GetBuffer());
+  else
+  {
+    m_textureRenderer->SetTexture(m_meshesPass->GetBuffer());
+  }
 
   m_textureRenderer->Render();
 }

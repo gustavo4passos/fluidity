@@ -27,10 +27,19 @@ set(ASSIMP_BUILD_ASSIMP_SAMPLES off)
 set(ASSIMP_INSTALL              off)
 add_subdirectory(./external/assimp)
 
+
+# External submodule - imgui
+file(GLOB IMGUI_SOURCES ./external/imgui/imgui.cpp ./external/imgui/imgui_demo.cpp ./external/imgui/imgui_draw.cpp ./external/imgui/imgui_tables.cpp ./external/imgui/imgui_widgets.cpp ./external/imgui/backends/imgui_impl_sdl.cpp ./external/imgui/backends/imgui_impl_opengl3.cpp)
+
+# External submodule - tinyfiledialogs
+file(GLOB TINYFILEDIALOGS_SOURCES ./external/libtinyfiledialogs/tinyfiledialogs.c)
+
+# External submodules includes
 include_directories(./external/cnpy/)
 include_directories(./external/assimp/include)
 include_directories(./external/imgui/backends)
 include_directories(./external/imgui)
+include_directories(./external/libtinyfiledialogs)
 # include_directories(./external/yaml-cpp/include)
 
 find_package(SDL2 CONFIG REQUIRED)
@@ -41,9 +50,8 @@ find_package(yaml-cpp CONFIG REQUIRED)
 find_path(STB_INCLUDE_DIRS "stb.h")
 
 file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp ./src/input/*.cpp)
-file(GLOB IMGUI_SOURCES ./external/imgui/imgui.cpp ./external/imgui/imgui_demo.cpp ./external/imgui/imgui_draw.cpp ./external/imgui/imgui_tables.cpp ./external/imgui/imgui_widgets.cpp ./external/imgui/backends/imgui_impl_sdl.cpp ./external/imgui/backends/imgui_impl_opengl3.cpp)
 
-add_executable(fluidity ${IMGUI_SOURCES} ${SOURCES})
+add_executable(fluidity ${IMGUI_SOURCES} ${SOURCES} ${TINYFILEDIALOGS_SOURCES})
 target_include_directories(fluidity PUBLIC ./src)
 
 # Assets
@@ -53,10 +61,11 @@ if (WIN32)
 elseif (UNIX)
     add_custom_target(copy-shaders COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/shaders ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
     add_custom_target(copy-assets COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets)
+
 endif ()
 
 
-add_dependencies(fluidity copy-assets copy-shaders)
+add_dependencies(fluidity copy-shaders copy-assets)
 
 if (WIN32)
     target_link_libraries(fluidity PUBLIC GLEW::GLEW SDL2::SDL2 SDL2::SDL2main cnpy assimp yaml-cpp)

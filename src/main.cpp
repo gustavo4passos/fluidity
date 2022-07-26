@@ -77,28 +77,28 @@ int main(int argc, char* args[])
     fluidity::FluidRenderer* renderer;
     renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0.06250);
 
-    fluidity::SceneSerializer ss(cmdLineArgs.scenePath);
-    ss.Deserialize();
-    std::cout << ss.GetScene().skyboxPath;
-    renderer->SetScene(ss.GetScene());
+    if (!cmdLineArgs.scenePath.empty())
+    {
+        fluidity::SceneSerializer ss(cmdLineArgs.scenePath);
+        ss.Deserialize();
+        fluidity::Scene sc = ss.GetScene();
+        renderer->SetScene(sc);
+    }
+    else renderer->SetScene({ });
 
     if(!renderer->Init())
     {
         LOG_ERROR("Unable to initialize fluid renderer.");
-        return 0;
+        return 6;
     }
 
-    Fluid f;
-    f.Load(cmdLineArgs.npzPath, "fluid_", cmdLineArgs.firstFrame, cmdLineArgs.frameCount);
+    fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
+    gui.Init();
 
     bool running = true;
     bool playing = true;
     bool showGui = true;
-    int currentFrame = 0;
 
-    SDL_CaptureMouse(SDL_TRUE);
-    fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
-    gui.Init();
 
     while(running) 
     {
@@ -136,12 +136,12 @@ int main(int argc, char* args[])
             renderer->ProcessInput(e);
         }
 
-        renderer->SetNumberOfParticles(f.GetNumberOfParticles(currentFrame));
-        renderer->SetVAO(f.GetFrameVao(currentFrame));
+
         renderer->Update();
         renderer->Render();
+
         if (showGui) gui.Render();
-        if (playing) currentFrame = (currentFrame + 1) % f.GetNumberOfFrames();
+        if (playing) renderer->AdvanceFrame();
 
         window.Swap();
     }

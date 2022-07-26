@@ -124,6 +124,22 @@ struct YAML::convert<fluidity::Camera>
     }
 };
 
+template<>
+struct YAML::convert<Fluid>
+{
+    static bool decode(const YAML::Node& node, Fluid& f)
+    {
+        if (!node.IsMap()) return false;
+        if (!node["fileList"] || !node["fileList"].IsSequence()) return false;
+
+        std::vector<std::string> fileList;
+        for (const auto& f : node["fileList"])
+        {
+           fileList.push_back(f.as<std::string>());
+        }
+        if (fileList.size() > 0) f.Load(fileList);
+    }
+};
 
 namespace fluidity
 {
@@ -191,8 +207,6 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
     return out;
 }
 
-
-
 YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
 {
     using namespace YAML;
@@ -205,7 +219,21 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     return out;
 }
 
+YAML::Emitter& operator << (YAML::Emitter& out, const Fluid& f)
+{
+    using namespace YAML;
+    out << BeginMap;
+    out << Key << "type" << Value << "npz";
+    out << Key << "fileList" << BeginSeq;
 
+    for (const auto& f : f.GetFileList())
+    {
+        out << f;
+    }
+    out << EndSeq << EndMap;
+
+    return out;
+}
 
 SceneSerializer::SceneSerializer(const std::string& filePath)
     : m_filePath(filePath)
@@ -236,6 +264,7 @@ void SceneSerializer::Serialize()
         out << EndSeq;
         out << Key << "Camera" << m_scene.camera;
         out << Key << "Skybox" << Value << m_scene.skyboxPath;
+        out << Key << "Fluid" << m_scene.fluid;
 
     out << EndMap;
 
@@ -304,6 +333,10 @@ bool SceneSerializer::Deserialize()
         sc.skyboxPath = root["Skybox"].as<std::string>();
     }
 
+    if (root["Fluid"])
+    {
+        sc.fluid = root["Fluid"].as<Fluid>();
+    }
     // TODO: Unecessary copy
     m_scene = sc;
     return true;

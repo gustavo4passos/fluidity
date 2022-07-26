@@ -1,5 +1,6 @@
 #pragma once
 #include "renderer/rendering_parameters.hpp"
+#include "Fluid.hpp"
 #include "utils/camera.hpp"
 #include "vec.hpp"
 #include <vector>
@@ -10,6 +11,7 @@ namespace fluidity
 {
 struct Scene
 {
+    Fluid fluid;
     FilteringParameters filteringParameters;
     FluidParameters fluidParameters;
     LightingParameters lightingParameters;

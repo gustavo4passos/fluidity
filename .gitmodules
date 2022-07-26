@@ -12,4 +12,4 @@
 	url = https://github.com/jbeder/yaml-cpp
 [submodule "external\\libtinyfiledialogs"]
 	path = external\\libtinyfiledialogs
-	url = https://github.com/native-toolkit/libtinyfiledialogs
+	url = https://github.com/gustavo4passos/libtinyfiledialogs

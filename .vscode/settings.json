@@ -87,7 +87,7 @@
         "xhash": "cpp"
     },
     "cmake.debugConfig": {
-        "args": ["C:\\dev\\FluidSimulationFiles\\Canyon\\DeepFluids", "200"]
+        "args": ["C:\\dev\\npz-rendering\\assets\\example-scene.yaml", "C:\\dev\\FluidSimulationFiles\\Canyon\\DeepFluids", "200", "600"]
     },
     "cmake.configureOnOpen": false
 }

@@ -23,9 +23,9 @@ public:
 
   bool Init();
   bool LoadScene();
+  void AdvanceFrame();
   
-  void SetVAO(GLuint vao);
-  void SetNumberOfParticles(unsigned n);
+  void SetScene(const Scene& scene) { m_scene = scene; }
 
   void Update() override;
   void Render() override;
@@ -33,10 +33,6 @@ public:
   void ProcessInput(const SDL_Event& event);
 
   friend class GuiLayer;
-
-  void SetScene(const Scene& scene) { m_scene = scene; }
-
-
 private:
   bool InitUniformBuffers();
   void UploadCameraData();
@@ -45,7 +41,8 @@ private:
   void SetUpStaticUniforms();
   void SetUpPerFrameUniforms();
 
-  GLuint m_currentVAO;
+  void SetVAOS();
+  void SetNumberOfParticles();
 
   Shader* m_skybBoxShader;
   // Render passes
@@ -73,10 +70,10 @@ private:
   static constexpr int NUM_TOTAL_LIGHTS = 8;
   Scene m_scene;
 
-  unsigned m_currentNumberOfParticles;
   unsigned m_windowWidth;
   unsigned m_windowHeight;
 
+  unsigned m_currentFrame = 0;
   float m_aspectRatio;
 };
 
