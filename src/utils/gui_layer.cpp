@@ -45,8 +45,8 @@ void GuiLayer::Render()
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
-    static bool showDemoWindow = true;
-    ImGui::ShowDemoWindow(&showDemoWindow);
+    // static bool showDemoWindow = true;
+    // ImGui::ShowDemoWindow(&showDemoWindow);
 
     RenderMainMenuBar();
 
@@ -120,18 +120,9 @@ void GuiLayer::RenderParametersWindow()
             ImGui::Separator();
             if (ImGui::Button("Load Skybox"))
             {
-                auto skyboxPath = tinyfd_selectFolderDialog("Load Skybox", nullptr);
-                if (skyboxPath != nullptr)
-                {
-                    Skybox s = Skybox(skyboxPath);
-                    if (s.Init())
-                    {
-                        // TODO: The scene should provide the skybox and models automatically
-                        meshesPass->AddSkybox(s);
-                        m_fluidRenderer->m_scene.skyboxPath = skyboxPath;
-                    }
-                }
+                LoadSkybox();
             }
+
             if (ImGui::Button("Clear Skybox"))
             {
                 meshesPass->RemoveSkybox();
@@ -139,7 +130,7 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::Separator();
             ImGui::Text("Models");
-            for (auto& model : meshesPass->GetModels())
+            for (auto& model : m_fluidRenderer->m_scene.models)
             {
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -156,18 +147,9 @@ void GuiLayer::RenderParametersWindow()
                 ImGui::PopID();
             }
 
-            static char modelPath[250];
-            ImGui::InputText("##load-model", modelPath, 250);
-            ImGui::SameLine();
             if (ImGui::Button("Load Model"))
             {
-                Model m = Model(modelPath);
-                if (m.Load())
-                {
-                    meshesPass->AddModel(m);
-                    meshesShadowPass->AddModel(m);
-                    m_fluidRenderer->m_scene.modelsPaths.push_back(modelPath);
-                }
+                LoadModel();
             }
         }
 
@@ -203,8 +185,8 @@ void GuiLayer::RenderParametersWindow()
                 LoadNewScene();
             }
         }
-        ImGui::End();
     }
+    ImGui::End();
 }
 
 void GuiLayer::RenderPerformanceOverlay()
@@ -256,6 +238,12 @@ void GuiLayer::RenderMainMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
+            if (ImGui::MenuItem("New Scene"))
+            {
+                m_fluidRenderer->SetScene(Scene::CreateEmptyScene());
+                m_fluidRenderer->LoadScene();
+            }
+
             if (ImGui::MenuItem("Load Scene"))
             {
                 LoadNewScene();
@@ -281,6 +269,16 @@ void GuiLayer::RenderMainMenuBar()
             if (ImGui::MenuItem("Load Fluid"))
             {
                LoadFluid();
+            }
+
+            if (ImGui::MenuItem("Load Skybox"))
+            {
+                LoadSkybox();
+            }
+
+            if (ImGui::MenuItem("Load Model"))
+            {
+               LoadModel();
             }
 
             ImGui::EndMenu();
@@ -349,4 +347,33 @@ void GuiLayer::SaveScene()
         ss.Serialize();
     }
 }
+
+void GuiLayer::LoadModel()
+{
+    auto modelPath = tinyfd_openFileDialog("Export Scene", nullptr, 0, nullptr, "Model Files", 0);
+    if (modelPath != nullptr)
+    {
+        Model m = Model(modelPath);
+        if (m.Load())
+        {
+            m_fluidRenderer->m_scene.models.push_back(m);
+        }
+    }
+}
+
+void GuiLayer::LoadSkybox()
+{
+    auto skyboxPath = tinyfd_selectFolderDialog("Load Skybox", nullptr);
+    if (skyboxPath != nullptr)
+    {
+        Skybox s = Skybox(skyboxPath);
+        if (s.Init())
+        {
+            // TODO: The scene should provide the skybox automatically
+            m_fluidRenderer->m_meshesPass->AddSkybox(s);
+            m_fluidRenderer->m_scene.skyboxPath = skyboxPath;
+        }
+    }
+}
+
 }

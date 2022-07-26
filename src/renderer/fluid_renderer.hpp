@@ -25,7 +25,7 @@ public:
   bool LoadScene();
   void AdvanceFrame();
   
-  void SetScene(const Scene& scene) { m_scene = scene; }
+  void SetScene(const Scene& scene);
 
   void Update() override;
   void Render() override;

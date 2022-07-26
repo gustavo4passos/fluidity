@@ -1,7 +1,9 @@
 #pragma once
+#include "renderer/model.hpp"
+#include "renderer/skybox.hpp"
 #include "renderer/rendering_parameters.hpp"
-#include "Fluid.hpp"
 #include "utils/camera.hpp"
+#include "Fluid.hpp"
 #include "vec.hpp"
 #include <vector>
 #include <string>
@@ -18,8 +20,25 @@ struct Scene
     Camera camera;
     Material fluidMaterial;
     std::vector<PointLight> lights = {};
-    std::vector<std::string> modelsPaths = {};
-    std::string skyboxPath = "";
+    std::vector<Model> models;
+    std::string skyboxPath;
+
+    static Scene CreateEmptyScene() 
+    {
+        return {
+            {},
+            { 4, 7, 100, false },
+            { 0.25, true, 0.0625 },
+            { 0.00100000005, 0.00999999978, 0.5, true, true },
+            { { 17, 8, 0.5 }},
+            {
+                { 0.2, 0.2, 0.2, 0.2 },
+                { 1, 1, 1, 1 },
+                { 1, 1, 1, 1 },
+                350.f,
+            }
+        };
+    }
 };
 
 

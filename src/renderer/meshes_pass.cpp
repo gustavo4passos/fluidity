@@ -11,12 +11,12 @@ MeshesPass::MeshesPass(int bufferWidth,
     const std::string& vsFilePath,
     const std::string& fsFilePath,
     const std::vector<FramebufferAttachment> attachments,
-    const std::vector<Model>& models)
+    Scene* scene)
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
-    m_models(models),
     m_vsFilePath(vsFilePath),
     m_fsFilePath(fsFilePath),
-    m_hasSkybox(false)
+    m_hasSkybox(false),
+    m_scene(scene)
 {
     for (const auto& attachment : attachments) m_framebuffer.PushAttachment(attachment);
 }
@@ -53,7 +53,7 @@ void MeshesPass::Render()
     BindTextures();
 
 
-    for (auto& model : m_models)
+    for (auto& model : m_scene->models)
     {
         for (auto& mesh : model.GetMeshes())
         {
@@ -131,15 +131,15 @@ void MeshesPass::RemoveSkybox()
     m_hasSkybox = false;
 }
 
-void MeshesPass::RemoveModels()
-{
-    for (auto& m : m_models)
-    {
-        m.CleanUp();
-    }
+// void MeshesPass::RemoveModels()
+// {
+//     for (auto& m : m_models)
+//     {
+//         m.CleanUp();
+//     }
 
-    m_models.clear();
-}
+//     m_models.clear();
+// }
 
 Skybox& MeshesPass::GetSkybox()
 {

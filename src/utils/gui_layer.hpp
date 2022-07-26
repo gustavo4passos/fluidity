@@ -20,6 +20,8 @@ private:
     void LoadNewScene();
     void SaveScene();
     void LoadFluid();
+    void LoadModel();
+    void LoadSkybox();
 
     void GuiLayer::RenderParametersWindow();
     void GuiLayer::RenderPerformanceOverlay();

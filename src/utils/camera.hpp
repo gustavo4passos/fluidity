@@ -8,7 +8,7 @@ namespace fluidity
   class Camera
   {
   public:
-    Camera(const glm::vec3& position = {}, float fov = 15, float aspectRatio = 16.f / 9.f); 
+    Camera(const glm::vec3& position = {}, float fov = 45, float aspectRatio = 16.f / 9.f); 
     Camera(const Camera&) = default;
   
     const glm::mat4 GetProjectionMatrix();

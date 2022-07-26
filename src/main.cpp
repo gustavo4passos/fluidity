@@ -59,8 +59,6 @@ int validateCommandLineArguments(const CommandLineArgs& cmdArgs)
 int main(int argc, char* args[])
 {
     auto cmdLineArgs = parseCommandArgs(argc, args);
-    auto validationStatus = validateCommandLineArguments(cmdLineArgs);
-    if (validationStatus != 0) return validationStatus;
 
     const unsigned int WINDOW_WIDTH = 1366;
     const unsigned int WINDOW_HEIGHT = 768;
@@ -84,7 +82,7 @@ int main(int argc, char* args[])
         fluidity::Scene sc = ss.GetScene();
         renderer->SetScene(sc);
     }
-    else renderer->SetScene({ });
+    else renderer->SetScene(fluidity::Scene::CreateEmptyScene());
 
     if(!renderer->Init())
     {

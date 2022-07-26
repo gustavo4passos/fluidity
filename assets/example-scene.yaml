@@ -13,7 +13,8 @@ Lights:
     specular: [1, 1, 1, 1]
     position: [-16, 24, 7.5, 1]
 Models:
-  - C:\dev\FluidSimulationFiles\Canyon\canyon_boundary.obj
+  - filePath: C:\dev\FluidSimulationFiles\Canyon\canyon_boundary.obj
+    genSmoothNormals: true
 Camera:
   position: [17, 8, 0.5]
   fov: 45

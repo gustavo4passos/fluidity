@@ -97,7 +97,8 @@ auto FluidRenderer::Init() -> bool
     { 
       { GL_RGB32F, GL_RGB, GL_FLOAT },
       { GL_R32F,   GL_RED, GL_FLOAT }
-    }
+    },
+    &m_scene
   );
 
   m_meshesShadowPass = new MeshesPass(
@@ -107,7 +108,8 @@ auto FluidRenderer::Init() -> bool
     "../../shaders/mesh-shadow.frag",
     {
       { GL_R32F, GL_RED, GL_FLOAT }
-    }
+    },
+    &m_scene
   );
 
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
@@ -158,25 +160,24 @@ auto FluidRenderer::Init() -> bool
   return true;
 }
 
+void FluidRenderer::SetScene(const Scene& scene)
+{
+  for (auto& model : m_scene.models)
+  {
+    model.CleanUp();
+  }
+  m_scene.fluid.CleanUp();
+
+  m_scene = scene;
+}
+
 bool FluidRenderer::LoadScene()
 {
-  m_meshesPass->RemoveModels();
-  m_meshesShadowPass->RemoveModels();
-  
-  for (const auto& mPath : m_scene.modelsPaths)
-  {
-    Model m(mPath, true);
-    if (!m.Load())
-    {
-      LOG_ERROR("Unable to load model " + mPath);
-      m_meshesPass->RemoveModels();
-      m_meshesShadowPass->RemoveModels();
-      return false;
-    }
-    m_meshesPass->AddModel(m);
-    m_meshesShadowPass->AddModel(m);
-  }
+  // Sanity check: Guarantes the fluid renderer has been init
+  assert(m_meshesPass != nullptr);
 
+  m_meshesPass->RemoveSkybox();
+  
   if (m_scene.skyboxPath != "")
   {
     Skybox skybox(m_scene.skyboxPath);

@@ -125,6 +125,20 @@ struct YAML::convert<fluidity::Camera>
 };
 
 template<>
+struct YAML::convert<Model>
+{
+    static bool decode(const YAML::Node& node, Model& m)
+    {
+        if (!node.IsMap()) return false;
+        auto filePath = node["filePath"].as<std::string>();
+        auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
+        m = Model(filePath, genSmoothNormals);
+
+        return true;
+    }
+};
+
+template<>
 struct YAML::convert<Fluid>
 {
     static bool decode(const YAML::Node& node, Fluid& f)
@@ -138,6 +152,8 @@ struct YAML::convert<Fluid>
            fileList.push_back(f.as<std::string>());
         }
         if (fileList.size() > 0) f.Load(fileList);
+
+        return true;
     }
 };
 
@@ -219,6 +235,17 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     return out;
 }
 
+YAML::Emitter& operator << (YAML::Emitter& out, const Model& m)
+{
+    using namespace YAML;
+    out << BeginMap;
+        out << Key << "filePath" << Value << m.GetFilePath();
+        out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
+    out << EndMap;
+
+    return out;
+}
+
 YAML::Emitter& operator << (YAML::Emitter& out, const Fluid& f)
 {
     using namespace YAML;
@@ -260,7 +287,7 @@ void SceneSerializer::Serialize()
             for (const auto& l : m_scene.lights) out << l;
         out << EndSeq;
         out << Key << "Models" << BeginSeq;
-            for (auto& m : m_scene.modelsPaths) out << m;
+            for (auto& m : m_scene.models) out << m;
         out << EndSeq;
         out << Key << "Camera" << m_scene.camera;
         out << Key << "Skybox" << Value << m_scene.skyboxPath;
@@ -324,7 +351,12 @@ bool SceneSerializer::Deserialize()
     {
         for (const auto& m : root["Models"])
         {
-            sc.modelsPaths.push_back(m.as<std::string>());
+            Model preloadedModel = m.as<Model>();
+            if (preloadedModel.Load())
+            {
+                sc.models.push_back(preloadedModel);
+            }
+            else LOG_ERROR("Unable to load model: " + preloadedModel.GetFilePath());
         }
     }
 
