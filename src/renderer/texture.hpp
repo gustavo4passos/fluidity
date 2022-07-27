@@ -2,7 +2,7 @@
 #define TEXTURE_H
 
 #include <string>
-#include <gl/glew.h>
+#include <GL/glew.h>
 
 enum class TextureFilteringMode
 {

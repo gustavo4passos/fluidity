@@ -21,11 +21,11 @@ add_subdirectory(./external/cnpy)
 # add_subdirectory(./external/yaml-cpp)
 
 # External submodule - assimp
-set(ASSIMP_BUILD_TESTS          off)
-set(ASSIMP_BUILD_ASSIMP_VIEW    off)
-set(ASSIMP_BUILD_ASSIMP_SAMPLES off)
-set(ASSIMP_INSTALL              off)
-add_subdirectory(./external/assimp)
+#set(ASSIMP_BUILD_TESTS          off)
+#set(ASSIMP_BUILD_ASSIMP_VIEW    off)
+#set(ASSIMP_BUILD_ASSIMP_SAMPLES off)
+#set(ASSIMP_INSTALL              off)
+#add_subdirectory(./external/assimp)
 
 
 # External submodule - imgui
@@ -36,18 +36,19 @@ file(GLOB TINYFILEDIALOGS_SOURCES ./external/libtinyfiledialogs/tinyfiledialogs.
 
 # External submodules includes
 include_directories(./external/cnpy/)
-include_directories(./external/assimp/include)
+#include_directories(./external/assimp/include)
 include_directories(./external/imgui/backends)
 include_directories(./external/imgui)
 include_directories(./external/libtinyfiledialogs)
 # include_directories(./external/yaml-cpp/include)
 
 find_package(SDL2 CONFIG REQUIRED)
+find_package(assimp REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
-find_path(STB_INCLUDE_DIRS "stb.h")
+#find_path(STB_INCLUDE_DIRS "stb.h")
 
 file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp ./src/input/*.cpp)
 

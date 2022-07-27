@@ -23,8 +23,8 @@ private:
     void LoadModel();
     void LoadSkybox();
 
-    void GuiLayer::RenderParametersWindow();
-    void GuiLayer::RenderPerformanceOverlay();
+    void RenderParametersWindow();
+    void RenderPerformanceOverlay();
 
     bool m_showPerformanceOverlay;
     bool m_showParametersWindow;
