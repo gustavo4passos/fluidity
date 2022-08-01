@@ -1,6 +1,7 @@
 #include "opengl_utils.hpp"
 #include <iostream>
 #include <vector>
+#include <limits>
 
 namespace fluidity
 {
