@@ -93,6 +93,7 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
             ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0005, 0.0001);
+            ImGui::DragFloat("Refraction Modifier", (float*)&fluidParameters.refractionModifier, 0.0005, 0.0001, 5, "%.4f");
 
             ImGui::Separator();
             ImGui::Text("Material");
@@ -271,10 +272,26 @@ void GuiLayer::RenderMainMenuBar()
                LoadFluid();
             }
 
+            if (ImGui::MenuItem("Clear Fluid"))
+            {
+               m_fluidRenderer->m_scene.fluid.CleanUp();
+            }
+
+            ImGui::Separator();
+            ImGui::Spacing();
+
             if (ImGui::MenuItem("Load Skybox"))
             {
                 LoadSkybox();
             }
+
+            if (ImGui::MenuItem("Clear Skybox"))
+            {
+                m_fluidRenderer->m_meshesPass->RemoveSkybox();
+            }
+
+            ImGui::Separator();
+            ImGui::Spacing();
 
             if (ImGui::MenuItem("Load Model"))
             {

@@ -7,7 +7,8 @@
 
 Model::Model(const std::string& filePath, bool genSmoothNormals)
     : m_filePath(filePath),
-    m_genSmoothNormals(genSmoothNormals)
+    m_genSmoothNormals(genSmoothNormals),
+    m_diffuseColor({})
 { /* */ }
 
 bool Model::Load()

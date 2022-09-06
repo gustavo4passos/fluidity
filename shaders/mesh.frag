@@ -41,6 +41,9 @@ uniform float uMaxShadowBias;
 uniform float uShadowIntensity;
 uniform int   uUsePcf;
 
+// Color 
+uniform vec3 uDiffuse;
+
 float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 {
     float distance = length(lightPos - fragPos);

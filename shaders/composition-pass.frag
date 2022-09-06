@@ -93,6 +93,7 @@ uniform int   u_TransparentFluid;
 // fluidity
 uniform float uMinShadowBias;
 uniform float uMaxShadowBias;
+uniform float uRefractionModifier;
 
 // in/out
 in vec2  f_TexCoord;
@@ -250,7 +251,7 @@ void main()
     colorAttennuation = mix(vec3(1, 1, 1), colorAttennuation, u_AttennuationConstant);
 
     vec3 refractionDir   = refract(-viewer, N, 1.0 / refractiveIndex);
-    vec3 refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + refractionDir.xy * thickness * u_AttennuationConstant * 0.1f).xyz;
+    vec3 refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + (refractionDir.xy * uRefractionModifier) * thickness * u_AttennuationConstant * 0.1f).xyz;
 
     fresnelRatio = mix(fresnelRatio, 1.0, u_ReflectionConstant);
     vec3 finalColor = (mix(refractionColor, reflectionColor, fresnelRatio) + specular * material.specular.xyz) * shadowColor;
