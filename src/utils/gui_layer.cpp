@@ -66,7 +66,8 @@ void GuiLayer::RenderParametersWindow()
         {
             auto& light = m_fluidRenderer->m_scene.lights[0];
             ImGui::Text("Light");
-            ImGui::PushID((int)&light);
+            // ImGui::PushID((int)&light);
+            ImGui::PushID(0);
             ImGui::DragFloat3("Position", (float*)&light.position, 0.5, -100.f, 100.f);
             ImGui::ColorEdit3("Diffuse", (float*)&light.diffuse);
             ImGui::ColorEdit3("Ambient", (float*)&light.ambient);
@@ -131,13 +132,15 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::Separator();
             ImGui::Text("Models");
+            int count=0;
             for (auto& model : m_fluidRenderer->m_scene.models)
             {
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text(model.GetFilePath().c_str());
                 bool hasSmoothedNormals = model.HasSmoothNormals();
-                ImGui::PushID((int)&model);
+                // ImGui::PushID((int)&model);
+                ImGui::PushID(count++);
                 ImGui::Checkbox("Smooth Normals", &hasSmoothedNormals);
                 if (hasSmoothedNormals != model.HasSmoothNormals())
                 {

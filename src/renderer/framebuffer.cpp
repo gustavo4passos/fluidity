@@ -1,5 +1,5 @@
 #include "framebuffer.hpp"
-#include "../utils/GLCall.h"
+#include "../utils/glcall.h"
 #include "../utils/logger.h"
 #include <assert.h>
 

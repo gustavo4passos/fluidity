@@ -336,7 +336,7 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     thicknessPassShader.Bind();
     thicknessPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius * 1.2f);
     thicknessPassShader.SetUniform1f("u_PointScale", 
-      (float)m_windowHeight / std::tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
+      (float)m_windowHeight / tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
     thicknessPassShader.SetUniform1i("u_HasSolid", 0);
     thicknessPassShader.Unbind();
   }
