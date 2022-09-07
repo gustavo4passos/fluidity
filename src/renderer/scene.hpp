@@ -47,6 +47,7 @@ class SceneSerializer
 public:
     SceneSerializer(const std::string& filePath);
     SceneSerializer(Scene scene, const std::string& filePath);
+
     
     bool Deserialize();
     void Serialize();
@@ -58,5 +59,14 @@ public:
 private:
     Scene m_scene;
     std::string m_filePath;
+
+    void SerializeModel(YAML::Emitter& out, const Model& m);
+    void SerializeFluid(YAML::Emitter& out, const Fluid& f);
+
+    bool DeserializeFluid(const YAML::Node& node, Fluid& f);
+    bool DeserializeModel(const YAML::Node& node, Model& m);
+
+    std::string GetRelativePathFromSceneFile(const std::string& path);
+    std::string GetAbsolutePathRelativeToScene(const std::string path);
 };
 }

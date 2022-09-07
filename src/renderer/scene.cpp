@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
+#include <filesystem>
 
 template<>
 struct YAML::convert<fluidity::FilteringParameters>
@@ -124,39 +124,6 @@ struct YAML::convert<fluidity::Camera>
     }
 };
 
-template<>
-struct YAML::convert<Model>
-{
-    static bool decode(const YAML::Node& node, Model& m)
-    {
-        if (!node.IsMap()) return false;
-        auto filePath = node["filePath"].as<std::string>();
-        auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
-        m = Model(filePath, genSmoothNormals);
-
-        return true;
-    }
-};
-
-template<>
-struct YAML::convert<Fluid>
-{
-    static bool decode(const YAML::Node& node, Fluid& f)
-    {
-        if (!node.IsMap()) return false;
-        if (!node["fileList"] || !node["fileList"].IsSequence()) return false;
-
-        std::vector<std::string> fileList;
-        for (const auto& f : node["fileList"])
-        {
-           fileList.push_back(f.as<std::string>());
-        }
-        if (fileList.size() > 0) f.Load(fileList);
-
-        return true;
-    }
-};
-
 namespace fluidity
 {
 YAML::Emitter& operator << (YAML::Emitter& out, const FilteringParameters& filteringParameters)
@@ -235,33 +202,6 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     return out;
 }
 
-YAML::Emitter& operator << (YAML::Emitter& out, const Model& m)
-{
-    using namespace YAML;
-    out << BeginMap;
-        out << Key << "filePath" << Value << m.GetFilePath();
-        out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
-    out << EndMap;
-
-    return out;
-}
-
-YAML::Emitter& operator << (YAML::Emitter& out, const Fluid& f)
-{
-    using namespace YAML;
-    out << BeginMap;
-    out << Key << "type" << Value << "npz";
-    out << Key << "fileList" << BeginSeq;
-
-    for (const auto& f : f.GetFileList())
-    {
-        out << f;
-    }
-    out << EndSeq << EndMap;
-
-    return out;
-}
-
 SceneSerializer::SceneSerializer(const std::string& filePath)
     : m_filePath(filePath)
 { /* */ }
@@ -273,6 +213,14 @@ SceneSerializer::SceneSerializer(Scene scene, const std::string& filePath)
 
 void SceneSerializer::Serialize()
 {  
+    std::filesystem::path basePath(m_filePath);
+
+    if (!basePath.has_filename())
+    {
+        LOG_ERROR("Scene file name cannot be a directory.");
+        return;
+    }
+
     using namespace YAML;
     Emitter out;
     out << BeginMap;
@@ -287,11 +235,11 @@ void SceneSerializer::Serialize()
             for (const auto& l : m_scene.lights) out << l;
         out << EndSeq;
         out << Key << "Models" << BeginSeq;
-            for (auto& m : m_scene.models) out << m;
+            for (auto& m : m_scene.models) SerializeModel(out, m);
         out << EndSeq;
         out << Key << "Camera" << m_scene.camera;
-        out << Key << "Skybox" << Value << m_scene.skyboxPath;
-        out << Key << "Fluid" << m_scene.fluid;
+        out << Key << "Skybox" << Value << GetRelativePathFromSceneFile(m_scene.skyboxPath);
+        SerializeFluid(out, m_scene.fluid);
 
     out << EndMap;
 
@@ -351,7 +299,14 @@ bool SceneSerializer::Deserialize()
     {
         for (const auto& m : root["Models"])
         {
-            Model preloadedModel = m.as<Model>();
+            Model preloadedModel;
+            // If model didn't deserialize properly, don't add it to scene
+            if (!DeserializeModel(m, preloadedModel))
+            {
+                LOG_ERROR(m_filePath + ": Unable to load model " + preloadedModel.GetFilePath());
+                continue;
+            }
+
             if (preloadedModel.Load())
             {
                 sc.models.push_back(preloadedModel);
@@ -362,16 +317,101 @@ bool SceneSerializer::Deserialize()
 
     if (root["Skybox"])
     {
-        sc.skyboxPath = root["Skybox"].as<std::string>();
+        sc.skyboxPath = GetAbsolutePathRelativeToScene(root["Skybox"].as<std::string>());
     }
 
     if (root["Fluid"])
     {
-        sc.fluid = root["Fluid"].as<Fluid>();
+        if (!DeserializeFluid(root["Fluid"], sc.fluid))
+        {
+            LOG_ERROR(m_filePath + ": Unable to load fluid.");
+        }
+
     }
     // TODO: Unecessary copy
     m_scene = sc;
     return true;
 }
 
+
+void SceneSerializer::SerializeModel (YAML::Emitter& out, const Model& m)
+{
+    using namespace YAML;
+    out << BeginMap;
+        out << Key << "filePath" << Value << GetRelativePathFromSceneFile(m.GetFilePath());
+        out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
+    out << EndMap;
+}
+
+void SceneSerializer::SerializeFluid(YAML::Emitter& out, const Fluid& f)
+{
+    using namespace YAML;
+    out << Key << "Fluid";
+    out << BeginMap;
+    out << Key << "type" << Value << "npz";
+    out << Key << "fileList" << BeginSeq;
+
+    for (const auto& f : f.GetFileList())
+    {
+        out << GetRelativePathFromSceneFile(f);
+    }
+    out << EndSeq << EndMap;
+}
+
+bool SceneSerializer::DeserializeFluid(const YAML::Node& node, Fluid& f)
+{
+    if (!node.IsMap()) return false;
+    if (!node["fileList"] || !node["fileList"].IsSequence()) return false;
+
+    // Absolute path is calculated her instead of using GetAbsolutePathRelativeToScene()
+    // for optimization purposes. Since each call to GetAbsolutePathRelativeToScene changes 
+    // the current path, and there can be many .npz files, we just do it adhoc, to avoid 
+    // the multiple changes.
+    std::filesystem::path oldPath = std::filesystem::current_path();
+    std::filesystem::current_path(std::filesystem::path(m_filePath).parent_path());
+
+    std::vector<std::string> fileList;
+    for (const auto& f : node["fileList"])
+    {
+        std::filesystem::path absolutePath = std::filesystem::canonical(f.as<std::string>());
+        fileList.push_back(absolutePath.generic_string());
+    }
+    std::filesystem::current_path(oldPath);
+
+    if (fileList.size() > 0) f.Load(fileList);
+
+    return true;
+}
+
+
+bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
+{
+    if (!node.IsMap()) return false;
+
+    auto filePath = GetAbsolutePathRelativeToScene(node["filePath"].as<std::string>());
+    auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
+    m = Model(filePath, genSmoothNormals);
+
+    return true;
+}
+
+
+std::string SceneSerializer::GetRelativePathFromSceneFile(const std::string& path)
+{
+    std::filesystem::path scenePath(m_filePath);
+    std::filesystem::path absolutePath(path);
+
+    return std::filesystem::relative(absolutePath, scenePath.parent_path()).generic_string(); 
+}
+
+std::string SceneSerializer::GetAbsolutePathRelativeToScene(const std::string path)
+{
+    std::filesystem::path oldPath = std::filesystem::current_path();
+    std::filesystem::current_path(std::filesystem::path(m_filePath).parent_path());
+    std::filesystem::path absolutePath = std::filesystem::canonical(path);
+    std::filesystem::current_path(oldPath);
+
+    return absolutePath.generic_string(); 
+
+}
 }
