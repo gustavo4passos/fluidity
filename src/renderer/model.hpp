@@ -22,7 +22,7 @@ public:
 
 private:
     vec3 m_position;
-    vec3 m_color;
+    vec3 m_diffuseColor;
     
     std::string m_filePath;
     std::vector<Mesh> m_meshes;

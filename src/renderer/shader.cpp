@@ -27,27 +27,27 @@ void Shader::Unbind() {
   GLCall(glUseProgram(0));
 }
 
-void Shader::SetUniform1f(const char* name, GLfloat v0){
-  GLCall(glUniform1f(GetUniformLocation(name), v0));
+void Shader::SetUniform1f(const char* name, GLfloat v0, bool silentFail){
+  GLCall(glUniform1f(GetUniformLocation(name, silentFail), v0));
 }
 
-void Shader::SetUniform2f(const char* name, GLfloat v0, GLfloat v1){
-  GLCall(glUniform2f(GetUniformLocation(name), v0, v1));
+void Shader::SetUniform2f(const char* name, GLfloat v0, GLfloat v1, bool silentFail){
+  GLCall(glUniform2f(GetUniformLocation(name, silentFail), v0, v1));
 }
 
-void Shader::SetUniform3f(const char* name, GLfloat v0, GLfloat v1, GLfloat v2) {
-  GLCall(glUniform3f(GetUniformLocation(name), v0, v1, v2));
+void Shader::SetUniform3f(const char* name, GLfloat v0, GLfloat v1, GLfloat v2, bool silentFail) {
+  GLCall(glUniform3f(GetUniformLocation(name, silentFail), v0, v1, v2));
 }
 
-void Shader::SetUniform4f(const char* name, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3){
-  GLCall(glUniform4f(GetUniformLocation(name), v0, v1, v2, v3));
+void Shader::SetUniform4f(const char* name, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3, bool silentFail){
+  GLCall(glUniform4f(GetUniformLocation(name, silentFail), v0, v1, v2, v3));
 }
 
-void Shader::SetUniformMat4(const char* name, const void* data){
-  GLCall(glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, (const GLfloat*)data));
+void Shader::SetUniformMat4(const char* name, const void* data, bool silentFail){
+  GLCall(glUniformMatrix4fv(GetUniformLocation(name, silentFail), 1, GL_FALSE, (const GLfloat*)data));
 }
 
-bool Shader::SetUniformBuffer (const char* name, GLuint blockBinding)
+bool Shader::SetUniformBuffer (const char* name, GLuint blockBinding, bool silentFail)
 {
   GLuint index = glGetUniformBlockIndex(_programID, name);
   if (index == GL_INVALID_INDEX) return false;
@@ -58,19 +58,19 @@ bool Shader::SetUniformBuffer (const char* name, GLuint blockBinding)
   return true;
 }
 
-void Shader::SetUniform3fv(const char* name, GLfloat* v0)
+void Shader::SetUniform3fv(const char* name, GLfloat* v0, bool silentFail)
 {
-  GLCall(glUniform3fv(GetUniformLocation(name), 1, v0));
+  GLCall(glUniform3fv(GetUniformLocation(name, silentFail), 1, v0));
 }
 
-void Shader::SetUniform1i(const char* name, GLint v0)
+void Shader::SetUniform1i(const char* name, GLint v0, bool silentFail)
 {
-  GLCall(glUniform1i(GetUniformLocation(name), v0));
+  GLCall(glUniform1i(GetUniformLocation(name, silentFail), v0));
 }
 
-void Shader::SetUniform1ui(const char* name, GLuint v0)
+void Shader::SetUniform1ui(const char* name, GLuint v0, bool silentFail)
 {
-  GLCall(glUniform1ui(GetUniformLocation(name), v0));
+  GLCall(glUniform1ui(GetUniformLocation(name, silentFail), v0));
 }
 
 void Shader::PrintActiveAttributes() const {
@@ -190,11 +190,11 @@ GLuint Shader::CompileShader(GLenum shaderType, const std::string& source) {
   return shader;
 }
 
-GLint Shader::GetUniformLocation(const std::string& name) {
+GLint Shader::GetUniformLocation(const std::string& name, bool silentFail) {
   GLint location = glGetUniformLocation(this->_programID, name.c_str());
 
   // If uniform isn't found in program
-  if(location == -1) LOG_ERROR("in shader " + _vertexShaderFilepath + " Unable to find uniform: " + name);
+  if(location == -1 && !silentFail) LOG_ERROR("in shader " + _vertexShaderFilepath + " Unable to find uniform: " + name);
 
   return location;
 }

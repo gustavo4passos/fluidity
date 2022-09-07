@@ -66,13 +66,13 @@ void GuiLayer::RenderParametersWindow()
         {
             auto& light = m_fluidRenderer->m_scene.lights[0];
             ImGui::Text("Light");
-            // ImGui::PushID((int)&light);
-            ImGui::PushID(0);
-            ImGui::DragFloat3("Position", (float*)&light.position, 0.5, -100.f, 100.f);
-            ImGui::ColorEdit3("Diffuse", (float*)&light.diffuse);
-            ImGui::ColorEdit3("Ambient", (float*)&light.ambient);
-            ImGui::ColorEdit3("Specular", (float*)&light.specular);
-            ImGui::PopID();
+            // TODO: The ## light identifier is used to avoid id conflicts on imgui, since it will create a hash
+            // using the name of the window and the ## identifier.
+            // However, it won't work when multiple lights are at play
+            ImGui::DragFloat3("Position##light", (float*)&light.position, 0.5, -100.f, 100.f);
+            ImGui::ColorEdit3("Diffuse##light", (float*)&light.diffuse);
+            ImGui::ColorEdit3("Ambient##light", (float*)&light.ambient);
+            ImGui::ColorEdit3("Specular##light", (float*)&light.specular);
 
             auto& lightingParameters = m_fluidRenderer->m_scene.lightingParameters;
             ImGui::Separator();
@@ -94,13 +94,14 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
             ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0005, 0.0001);
+            ImGui::DragFloat("Refraction Modifier", (float*)&fluidParameters.refractionModifier, 0.0005, 0.0001, 5, "%.4f");
 
             ImGui::Separator();
             ImGui::Text("Material");
-            ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
-            ImGui::ColorEdit3("Ambient", (float*)&material.ambient);
-            ImGui::ColorEdit3("Specular", (float*)&material.specular);
-            ImGui::DragFloat("Shininess", (float*)&material.shininess, 0.5, 0, 1000);
+            ImGui::ColorEdit3("Diffuse##fluidMaterial", (float*)&material.diffuse);
+            ImGui::ColorEdit3("Ambient##fluidMaterial", (float*)&material.ambient);
+            ImGui::ColorEdit3("Specular##fluidMaterial", (float*)&material.specular);
+            ImGui::DragFloat("Shininess##fluidMaterial", (float*)&material.shininess, 0.5, 0, 1000);
             
             ImGui::Separator();
             ImGui::Checkbox("Transparent", &fluidParameters.transparentFluid);
@@ -131,15 +132,15 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::Separator();
             ImGui::Text("Models");
-            int count=0;
+            // Used to avoid id conflicts on imgui
+            int modelIdHash = 0;
             for (auto& model : m_fluidRenderer->m_scene.models)
             {
                 ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text(model.GetFilePath().c_str());
                 bool hasSmoothedNormals = model.HasSmoothNormals();
-                // ImGui::PushID((int)&model);
-                ImGui::PushID(count++);
+                ImGui::PushID(modelIdHash++);
                 ImGui::Checkbox("Smooth Normals", &hasSmoothedNormals);
                 if (hasSmoothedNormals != model.HasSmoothNormals())
                 {
@@ -274,10 +275,26 @@ void GuiLayer::RenderMainMenuBar()
                LoadFluid();
             }
 
+            if (ImGui::MenuItem("Clear Fluid"))
+            {
+               m_fluidRenderer->m_scene.fluid.CleanUp();
+            }
+
+            ImGui::Separator();
+            ImGui::Spacing();
+
             if (ImGui::MenuItem("Load Skybox"))
             {
                 LoadSkybox();
             }
+
+            if (ImGui::MenuItem("Clear Skybox"))
+            {
+                m_fluidRenderer->m_meshesPass->RemoveSkybox();
+            }
+
+            ImGui::Separator();
+            ImGui::Spacing();
 
             if (ImGui::MenuItem("Load Model"))
             {

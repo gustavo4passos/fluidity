@@ -419,11 +419,14 @@ void FluidRenderer::SetUpPerFrameUniforms()
   auto& compositionPassShader = m_compositionPass->GetShader();
   compositionPassShader.Bind();
   compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
-  compositionPassShader.SetUniform1i("u_HasShadow", lightingParameters.renderShadows ? 1 : 0);
+  // Detail: Shadows require at least one mesh for now
+  // TODO: This will change when fluid shadows are added
+  compositionPassShader.SetUniform1i("u_HasShadow", lightingParameters.renderShadows && m_scene.models.size() > 0 ? 1 : 0);
   compositionPassShader.SetUniform1f("u_ShadowIntensity", lightingParameters.shadowIntensity);
   compositionPassShader.SetUniform1f("u_AttennuationConstant", fluidParameters.attenuation);
   compositionPassShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
   compositionPassShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
+  compositionPassShader.SetUniform1f("uRefractionModifier", fluidParameters.refractionModifier);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
