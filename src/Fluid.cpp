@@ -72,14 +72,24 @@ GLuint Fluid::GetFrameVao(int frame)
 // TODO: This needs to be optimized
 bool Fluid::LoadFrameToVao(int frame)
 {
+    size_t posComponentWordSize = GetFramePosArray(frame).word_size;
+    // Only 32 and 64 bit floating-point types are allowed
+    assert(posComponentWordSize == 4 || posComponentWordSize == 8);
+    
     // TODO: Perform error checking
     GLuint vao, vbo;
     GLCall(glGenVertexArrays(1, &vao));
     GLCall(glGenBuffers(1, &vbo));
     GLCall(glBindVertexArray(vao));
     GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo));
-    GLCall(glBufferData(GL_ARRAY_BUFFER, GetFramePosArray(frame).num_bytes(), (const void*)GetFramePosData(frame), GL_STATIC_DRAW));
-    GLCall(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (const void *)0));
+
+    const void* posArrayPointer;
+    if (posComponentWordSize == 4) posArrayPointer = (const void*)GetFramePosData<vec3>(frame);
+    else posArrayPointer = (const void*)GetFramePosData<dVec3>(frame);
+
+    GLCall(glBufferData(GL_ARRAY_BUFFER, GetFramePosArray(frame).num_bytes(), posArrayPointer, GL_STATIC_DRAW));
+    GLCall(glVertexAttribPointer(0, 3, GetFrameDataType(frame), GL_FALSE, 
+        3 * GetFramePosArray(frame).word_size, (const void *)0));
     GLCall(glEnableVertexAttribArray(0));
 
     m_FrameVaos.insert(m_FrameVaos.begin() + frame, vao);
@@ -88,10 +98,14 @@ bool Fluid::LoadFrameToVao(int frame)
     return true;
 }
 
-
-vec3* Fluid::GetFramePosData(int frame)
+GLenum Fluid::GetFrameDataType(int frame)
 {
-    return GetFramePosArray(frame).data<vec3>();
+    auto wordSize = GetFramePosArray(frame).word_size;
+    // Only 32 and 64 bit floating-point types are allowed
+    assert(wordSize == 4 || wordSize == 8);
+
+    if (wordSize == 4) return GL_FLOAT;
+    return GL_DOUBLE;
 }
 
 cnpy::NpyArray& Fluid::GetFramePosArray(int frame)
@@ -104,7 +118,7 @@ int Fluid::GetNumberOfParticles(int frame)
     if (m_Count == 0) return 0;
     
     const int NUM_COMPONENTS = 3;
-    const int COMPONENT_SIZE = 4; // Bytes
+    const int COMPONENT_SIZE = GetFramePosArray(frame).word_size; // Bytes
     return GetFramePosArray(frame).num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
 }
  

@@ -20,13 +20,18 @@ public:
     int GetNumberOfParticles(int frame);
     int GetNumberOfFrames() const { return m_Count; }
     const std::vector<std::string>& GetFileList() const { return m_npzFileList; }
-    vec3* GetFramePosData(int frame);
+
+    template<typename T>
+    T* GetFramePosData(int frame);
+
     GLuint GetFrameVao(int frame);
     cnpy::NpyArray& GetFrameVelData(int frame);
 
 private:
     cnpy::NpyArray& GetFramePosArray(int frame);
     bool LoadFrameToVao(int frame);
+
+    GLenum GetFrameDataType(int frame);
 
     bool Load();
     int m_Count;
@@ -35,3 +40,9 @@ private:
     std::vector<GLuint> m_FrameVaos;
     std::vector<GLuint> m_FrameVbos;
 };
+
+template<typename T>
+T* Fluid::GetFramePosData(int frame)
+{
+    return GetFramePosArray(frame).data<T>();
+}
