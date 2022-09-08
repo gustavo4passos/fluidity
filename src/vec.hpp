@@ -11,6 +11,12 @@ struct vec3 {
     float z;
 };
 
+struct dVec3 {
+    double x;
+    double y;
+    double z;
+};
+
 #pragma pack(push, 1)
 struct Vec4 {
   float x;
