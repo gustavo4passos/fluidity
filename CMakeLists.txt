@@ -41,6 +41,7 @@ elseif (UNIX)
     # External dependencies includes - linux
     include_directories(/usr/include/imgui/backends)
     include_directories(/usr/include/imgui)
+    include_directories(/usr/include/stb)
 
     find_package(imgui QUIET COMPONENTS imgui-core imgui-sdl imgui-opengl3)
     find_package(assimp REQUIRED)
