@@ -29,13 +29,10 @@ bool Fluid::Load()
     // TODO: Perform error checking
     for (int i = 0; i < m_npzFileList.size(); i++)
     {
-        m_fileData.push_back(
-            cnpy::npz_load(
-                m_npzFileList[i]
-            )
-        );
-        m_Count = i + 1;
-        LoadFrameToVao(i);
+        cnpy::npz_t particleData = cnpy::npz_load(m_npzFileList[i]);
+        auto posParticleData = GetFramePosArray(particleData);
+        auto [ frameVao, frameVbo ] = LoadParticleDataToVao(posParticleData);
+        m_frameData.push_back({ CalcNumberOfParticles(posParticleData), frameVao, frameVbo });
     }
 
     return true; 
@@ -44,63 +41,54 @@ bool Fluid::Load()
 
 void Fluid::CleanUp()
 {
-    m_Count = 0;
-
-    for (int i = 0; i < m_FrameVaos.size(); i++)
+    for (auto& f : m_frameData)
     {
-        GLCall(glDeleteBuffers(1, &m_FrameVbos[i]));
-        GLCall(glDeleteVertexArrays(1, &m_FrameVaos[i]));
+        GLCall(glDeleteBuffers(1, &f.vbo));
+        GLCall(glDeleteVertexArrays(1, &f.vao));
     }
 
-    m_FrameVaos.clear();
-    m_FrameVbos.clear();
-    m_fileData.clear();
-}
-
-cnpy::npz_t& Fluid::GetFrameData(int frame) 
-{
-    assert(frame < m_Count);
-    return m_fileData[frame];
+    m_frameData.clear();
 }
 
 GLuint Fluid::GetFrameVao(int frame)
 {
-    assert(frame < m_Count);
-    return m_FrameVaos[frame];
+    assert(frame < GetNumberOfFrames());
+    return m_frameData[frame].vao;
 }
 
-// TODO: This needs to be optimized
-bool Fluid::LoadFrameToVao(int frame)
+// TODO: Error checking. glBufferData and glGen[VertexArrays, Buffers] might throw a memory
+// error. How to deal with datasets that can't fit in memory? Initially, maybe just unload
+// them, but a data streaming option might be interesting for these cases.
+// TODO: [Optimization] This needs to be optimized
+std::tuple<GLuint, GLuint> Fluid::LoadParticleDataToVao(const cnpy::NpyArray& data)
 {
-    size_t posComponentWordSize = GetFramePosArray(frame).word_size;
+    size_t posComponentWordSize = data.word_size;
     // Only 32 and 64 bit floating-point types are allowed
     assert(posComponentWordSize == 4 || posComponentWordSize == 8);
     
     // TODO: Perform error checking
     GLuint vao, vbo;
+    // TODO: [Optimization] A VAO for each particle is probably unecessary. The layout is
+    // the same for every 32 OR 64 fp particle data. (So, likely, only 2 vaos are necessary)
     GLCall(glGenVertexArrays(1, &vao));
     GLCall(glGenBuffers(1, &vbo));
     GLCall(glBindVertexArray(vao));
     GLCall(glBindBuffer(GL_ARRAY_BUFFER, vbo));
 
     const void* posArrayPointer;
-    if (posComponentWordSize == 4) posArrayPointer = (const void*)GetFramePosData<vec3>(frame);
-    else posArrayPointer = (const void*)GetFramePosData<dVec3>(frame);
+    if (posComponentWordSize == 4) posArrayPointer = (const void*)data.data<vec3>();
+    else posArrayPointer = (const void*)data.data<dVec3>();
 
-    GLCall(glBufferData(GL_ARRAY_BUFFER, GetFramePosArray(frame).num_bytes(), posArrayPointer, GL_STATIC_DRAW));
-    GLCall(glVertexAttribPointer(0, 3, GetFrameDataType(frame), GL_FALSE, 
-        3 * GetFramePosArray(frame).word_size, (const void *)0));
+    GLCall(glBufferData(GL_ARRAY_BUFFER, data.num_bytes(), posArrayPointer, GL_STATIC_DRAW));
+    GLCall(glVertexAttribPointer(0, 3, GetDataTypeFromWordSize(posComponentWordSize), 
+        GL_FALSE, 3 * posComponentWordSize, (const void *)0));
     GLCall(glEnableVertexAttribArray(0));
 
-    m_FrameVaos.insert(m_FrameVaos.begin() + frame, vao);
-    m_FrameVbos.insert(m_FrameVbos.begin() + frame, vbo);
-
-    return true;
+    return { vao, vbo };
 }
 
-GLenum Fluid::GetFrameDataType(int frame)
+GLenum Fluid::GetDataTypeFromWordSize(size_t wordSize)
 {
-    auto wordSize = GetFramePosArray(frame).word_size;
     // Only 32 and 64 bit floating-point types are allowed
     assert(wordSize == 4 || wordSize == 8);
 
@@ -108,17 +96,23 @@ GLenum Fluid::GetFrameDataType(int frame)
     return GL_DOUBLE;
 }
 
-cnpy::NpyArray& Fluid::GetFramePosArray(int frame)
+cnpy::NpyArray& Fluid::GetFramePosArray(cnpy::npz_t& particleData)
 {
-    return GetFrameData(frame)["pos"];
+    return particleData["pos"];
 }
 
 int Fluid::GetNumberOfParticles(int frame)
 {
-    if (m_Count == 0) return 0;
+    assert(frame < GetNumberOfFrames());
+    return m_frameData[frame].nParticles;
+}
+
+int Fluid::CalcNumberOfParticles(const cnpy::NpyArray& particleData)
+{
+    if (GetNumberOfFrames() == 0) return 0;
     
     const int NUM_COMPONENTS = 3;
-    const int COMPONENT_SIZE = GetFramePosArray(frame).word_size; // Bytes
-    return GetFramePosArray(frame).num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
+    const int COMPONENT_SIZE = particleData.word_size; // Bytes
+    return particleData.num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
 }
  
