@@ -209,6 +209,9 @@ bool FluidRenderer::LoadScene()
 
   SetUpStaticUniforms();
 
+  ResetPlayback();
+  Play();
+  
   return true;
 }
 
@@ -221,6 +224,12 @@ void FluidRenderer::AdvanceFrame()
   }
   else m_currentFrame = 0;
 }
+
+void FluidRenderer::SetCurrentFrame(int frame)
+{
+  m_currentFrame = frame < m_scene.fluid.GetNumberOfFrames() ? frame : m_currentFrame;
+}
+
 
 auto FluidRenderer::SetVAOS() -> void
 {
@@ -451,6 +460,7 @@ void FluidRenderer::SetUpPerFrameUniforms()
 auto FluidRenderer::Update() -> void
 {
   m_cameraController.Update();
+  if (IsPlaying()) AdvanceFrame();
 }
 
 auto FluidRenderer::Render() -> void

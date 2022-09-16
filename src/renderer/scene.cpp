@@ -253,7 +253,7 @@ bool SceneSerializer::Deserialize()
 
     if (!sceneFile)
     {
-        LOG_ERROR("Unable to open stage file: " + m_filePath);
+        LOG_ERROR("Unable to open scene file: " + m_filePath);
         return false;
     }
     std::stringstream contentStream;
