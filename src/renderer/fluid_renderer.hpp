@@ -23,7 +23,15 @@ public:
 
   bool Init();
   bool LoadScene();
+
+  // Playback methods
+  void Play()            { m_playing = true;       }
+  void Pause()           { m_playing = false;      }
+  void TogglePlayPause() { m_playing = !m_playing; }
+  bool IsPlaying()       { return m_playing;       }
+  void ResetPlayback()   { m_currentFrame = 0;     }
   void AdvanceFrame();
+  void SetCurrentFrame(int frame);
   
   void SetScene(const Scene& scene);
 
@@ -31,6 +39,7 @@ public:
   void Render() override;
 
   void ProcessInput(const SDL_Event& event);
+  int GetCurrentFrame() { return m_currentFrame; }
 
   friend class GuiLayer;
 private:
@@ -74,6 +83,7 @@ private:
   unsigned m_windowHeight;
 
   unsigned m_currentFrame = 0;
+  bool m_playing = false;
   float m_aspectRatio;
 };
 

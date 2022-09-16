@@ -94,9 +94,7 @@ int main(int argc, char* args[])
     gui.Init();
 
     bool running = true;
-    bool playing = true;
     bool showGui = true;
-
 
     while(running) 
     {
@@ -119,7 +117,7 @@ int main(int argc, char* args[])
 
                     case SDLK_SPACE:
                     {
-                        playing = !playing;
+                        renderer->TogglePlayPause();
                     } break;
 
                     case SDLK_i:
@@ -139,7 +137,6 @@ int main(int argc, char* args[])
         renderer->Render();
 
         if (showGui) gui.Render();
-        if (playing) renderer->AdvanceFrame();
 
         window.Swap();
     }

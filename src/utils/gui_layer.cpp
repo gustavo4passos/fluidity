@@ -28,6 +28,8 @@ bool GuiLayer::Init()
     ImGui_ImplSDL2_InitForOpenGL(m_window, m_glContext);
     ImGui_ImplOpenGL3_Init("#version 450");
 
+    SetDefaultThemeColors();
+
     return true;
 }
 
@@ -52,6 +54,7 @@ void GuiLayer::Render()
 
     if (m_showPerformanceOverlay) RenderPerformanceOverlay();
     if (m_showParametersWindow) RenderParametersWindow();    
+    RenderPlaybackBar();
     
 
     ImGui::Render();
@@ -220,6 +223,8 @@ void GuiLayer::RenderPerformanceOverlay()
         ImGui::Separator();
         ImGui::Text("%.1f FPS", io.Framerate);
         ImGui::Text("%.3f ms/frame", 1000.f / io.Framerate);
+        ImGui::Text("%d particles", m_fluidRenderer->m_scene.fluid.
+            GetNumberOfParticles(m_fluidRenderer->GetCurrentFrame()));
 
         if (ImGui::BeginPopupContextWindow())
         {
@@ -234,7 +239,54 @@ void GuiLayer::RenderPerformanceOverlay()
     }
     
     ImGui::End();
+
 }
+
+void GuiLayer::RenderPlaybackBar()
+{
+    auto mousePos = ImGui::GetMousePos();
+
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | 
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
+    ImGuiIO& io = ImGui::GetIO();
+    auto windowPadding = ImGui::GetStyle().WindowPadding;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const float PAD = 20.f;
+    ImVec2 workSize = viewport->WorkSize;
+    ImVec2 workPos  = viewport->WorkPos;
+    ImVec2 windowPos, windowSize, windowPivot;
+    windowPos.x = workPos.x;
+    windowPos.y = viewport->Size.y;
+    windowSize.x = workSize.x;
+    windowPivot = { 0.f, 1.f };
+    
+    if (mousePos.y < workSize.y - (workSize.y * 0.2)) return;
+
+    ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always, windowPivot);
+    ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+
+    ImGui::SetNextWindowBgAlpha(0.35f);
+    if (ImGui::Begin("Playback Bar", nullptr, windowFlags))
+    {
+        auto textWidth = ImGui::CalcTextSize("Frame").x;
+        ImGui::SetCursorPosX((ImGui::GetWindowSize().x - textWidth) * 0.5);
+        ImGui::Text("Playback");
+        int currentFrame = m_fluidRenderer->GetCurrentFrame();
+        int numberOfFrames = m_fluidRenderer->m_scene.fluid.GetNumberOfFrames();
+        ImGui::SetNextItemWidth({ windowSize.x - windowPadding.x * 2 });
+        ImGui::SliderInt("##playback-seek-bar", &currentFrame, 0, numberOfFrames, "%d");
+
+        ImGui::SetCursorPosX((ImGui::GetWindowSize().x - 100) * 0.5);
+        if (ImGui::Button(m_fluidRenderer->IsPlaying() ? "Pause" : "Play", { 100, 30 }))
+        {
+            m_fluidRenderer->TogglePlayPause();
+        }
+        m_fluidRenderer->SetCurrentFrame(currentFrame);
+    }
+    ImGui::End();
+}
+
+
 
 void GuiLayer::RenderMainMenuBar()
 {
@@ -352,6 +404,8 @@ void GuiLayer::LoadFluid()
     {
         m_fluidRenderer->m_currentFrame = 0;
         m_fluidRenderer->m_scene.fluid.Load(fileList);
+        m_fluidRenderer->ResetPlayback();
+        m_fluidRenderer->Play();
     }
 }
 
@@ -361,9 +415,19 @@ void GuiLayer::SaveScene()
     auto exportScenePath = tinyfd_saveFileDialog("Export Scene", nullptr, 1, acceptedFileTypes, "Scene files");
     if (exportScenePath != nullptr) 
     {
+        // Add *.yml to the end of the file name, in case it already doesn't contain it
+        std::string exportScenePathStr = exportScenePath;
+        std::string sceneFileExtension = SceneSerializer::SCENE_FILE_EXTENSION;
+        if (exportScenePathStr.size() < sceneFileExtension.size() + 1 || 
+        !std::equal(
+            sceneFileExtension.rbegin(), sceneFileExtension.rend(), 
+            exportScenePathStr.rbegin()))
+        {
+            exportScenePathStr += sceneFileExtension;
+        }
         Scene sc = m_fluidRenderer->m_scene;
         sc.camera = m_fluidRenderer->m_cameraController.GetCamera();
-        SceneSerializer ss = SceneSerializer(sc, exportScenePath);
+        SceneSerializer ss = SceneSerializer(sc, exportScenePathStr);
         ss.Serialize();
     }
 }
@@ -394,6 +458,61 @@ void GuiLayer::LoadSkybox()
             m_fluidRenderer->m_scene.skyboxPath = skyboxPath;
         }
     }
+}
+
+void GuiLayer::SetDefaultThemeColors()
+{
+    ImGuiStyle* style = &ImGui::GetStyle();
+    ImVec4* colors = style->Colors;
+
+    colors[ImGuiCol_Text]                   = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled]           = ImVec4(0.80f, 0.80f, 0.80f, 1.00f);
+    colors[ImGuiCol_WindowBg]               = ImVec4(0.156f, 0.156f, 0.156f, 1.f);
+    colors[ImGuiCol_ChildBg]                = ImVec4(0.301f, 0.301f, 0.301f, 1.f);
+    colors[ImGuiCol_PopupBg]                = ImVec4(0.301f, 0.301f, 0.301f, 1.f);
+    colors[ImGuiCol_Border]                 = ImVec4(0.219f, 0.219f, 0.219f, 1.f);
+    colors[ImGuiCol_BorderShadow]           = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_FrameBg]                = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
+    colors[ImGuiCol_FrameBgHovered]         = ImVec4(0.25f, 0.25f, 0.25f, 1.f);
+    colors[ImGuiCol_FrameBgActive]          = ImVec4(0.21f, 0.21f, 0.21f, 1.f);
+    colors[ImGuiCol_TitleBg]                = ImVec4(0.258f, 0.258f, 0.258f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]          = ImVec4(0.27f, 0.278, 0.27f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(1.24f, 0.24f, 0.24f, 1.00f);
+    colors[ImGuiCol_Tab]                    = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
+    colors[ImGuiCol_TabActive]              = ImVec4(0.325f, 0.325f, 0.325f, 1.f);
+    colors[ImGuiCol_TabHovered]             = ImVec4(0.309f, 0.309f, 0.309f, 1.f);
+    colors[ImGuiCol_TabUnfocused]           = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
+    colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.325f, 0.325f, 0.325f, 1.f);
+    colors[ImGuiCol_MenuBarBg]              = ImVec4(0.325f, 0.325f, 0.325f, 1.f);
+    colors[ImGuiCol_ScrollbarBg]            = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
+    colors[ImGuiCol_ScrollbarGrab]          = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered]   = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive]    = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+    colors[ImGuiCol_CheckMark]              = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+    colors[ImGuiCol_SliderGrab]             = ImVec4(.9f, .9f, .9f, 1.f);
+    colors[ImGuiCol_SliderGrabActive]       = ImVec4(1.f, 1.f, 1.f, 1.f);
+    colors[ImGuiCol_Button]                 = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
+    colors[ImGuiCol_ButtonHovered]          = ImVec4(0.23f, 0.23f, 0.23f, 1.f);
+    colors[ImGuiCol_ButtonActive]           = ImVec4(0.20f, 0.20f, 0.20f, 1.f);
+    colors[ImGuiCol_Header]                 = ImVec4(0.258f, 0.258f, 0.258f, 1.00f);
+    colors[ImGuiCol_HeaderHovered]          = ImVec4(0.25f, 0.25f, 0.25f, 1.f);
+    colors[ImGuiCol_HeaderActive]           = ImVec4(0.21f, 0.21f, 0.21f, 1.f);
+    colors[ImGuiCol_Separator]              = colors[ImGuiCol_Border];
+    colors[ImGuiCol_SeparatorHovered]       = ImVec4(0.2f, 0.2f, 0.2f, 1.f);
+    colors[ImGuiCol_SeparatorActive]        = ImVec4(0.18f, 0.18f, 0.18f, 1.f);
+    colors[ImGuiCol_ResizeGrip]             = colors[ImGuiCol_Border];
+    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.2f, 0.2f, 0.2f, 1.f);
+    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.18f, 0.18f, 0.219f, 1.f);
+    colors[ImGuiCol_PlotLines]              = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+    colors[ImGuiCol_PlotHistogram]          = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextSelectedBg]         = ImVec4(0.f, 1.f, 0.f, 1.f);
+    colors[ImGuiCol_DragDropTarget]         = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
+    colors[ImGuiCol_NavHighlight]           = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight]  = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+    colors[ImGuiCol_NavWindowingDimBg]      = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 }
 
 }

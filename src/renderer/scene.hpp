@@ -55,6 +55,7 @@ public:
     const Scene& GetScene() { return m_scene; }
 
     static constexpr char* SERIALIZER_VERSION = "1.0";
+    static constexpr char* SCENE_FILE_EXTENSION = ".yml";
 
 private:
     Scene m_scene;

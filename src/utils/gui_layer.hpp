@@ -22,9 +22,11 @@ private:
     void LoadFluid();
     void LoadModel();
     void LoadSkybox();
+    void RenderPlaybackBar();
 
     void RenderParametersWindow();
     void RenderPerformanceOverlay();
+    void SetDefaultThemeColors();
 
     bool m_showPerformanceOverlay;
     bool m_showParametersWindow;
