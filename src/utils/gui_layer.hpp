@@ -19,10 +19,13 @@ private:
     void RenderMainMenuBar();
     void LoadNewScene();
     void SaveScene();
+    void SaveSceneAs();
     void LoadFluid();
     void LoadModel();
     void LoadSkybox();
     void RenderPlaybackBar();
+
+    std::string GetNewSceneFilenameDialog();
 
     void RenderParametersWindow();
     void RenderPerformanceOverlay();

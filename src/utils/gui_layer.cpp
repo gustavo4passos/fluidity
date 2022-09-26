@@ -1,4 +1,5 @@
 #include "utils/gui_layer.hpp"
+#include "utils/logger.h"
 #include "renderer/fluid_renderer.hpp"
 #include "tinyfiledialogs.h"
 #include <imgui_impl_sdl.h>
@@ -11,8 +12,7 @@ GuiLayer::GuiLayer(SDL_Window* window, void* glContext, FluidRenderer* fluidRend
     m_glContext(glContext),
     m_fluidRenderer(fluidRenderer),
     m_showPerformanceOverlay(false),
-    m_showParametersWindow(false),
-    m_sceneSerializer("./defaults.yaml")
+    m_showParametersWindow(false)
 { /* */ }
 
 bool GuiLayer::Init()
@@ -20,8 +20,8 @@ bool GuiLayer::Init()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     ImGui::StyleColorsDark();
 
@@ -56,7 +56,6 @@ void GuiLayer::Render()
     if (m_showParametersWindow) RenderParametersWindow();    
     RenderPlaybackBar();
     
-
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
@@ -111,13 +110,16 @@ void GuiLayer::RenderParametersWindow()
             ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
             ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
             ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
+
+            ImGui::Separator();
             ImGui::Checkbox("Gamma Correction", &filteringParameters.gammaCorrection);
+            ImGui::Checkbox("Use Refactinon Mask", &filteringParameters.useRefractionMask);
         }
 
-        if (ImGui::CollapsingHeader("Background"))
+        if (ImGui::CollapsingHeader("Environment"))
         {
-            auto& renderState = m_fluidRenderer->m_meshesPass->GetRenderState();
-            ImGui::ColorEdit3("Background color", (float*)&renderState.clearColor);
+            auto& scene = m_fluidRenderer->m_scene;
+            ImGui::ColorEdit3("Background color", (float*)&scene.clearColor);
 
             auto meshesPass       = m_fluidRenderer->m_meshesPass;
             auto meshesShadowPass = m_fluidRenderer->m_meshesShadowPass;
@@ -151,6 +153,21 @@ void GuiLayer::RenderParametersWindow()
                     model.CleanUp();
                     model.Load();
                 }
+
+                ImGui::SameLine();
+                bool visible = model.IsVisible();
+                ImGui::Checkbox("Visible", &visible);
+                model.SetIsVisible(visible);
+
+                ImGui::SameLine();
+                bool hideFrontFaces = model.GetHideFrontFaces();
+                ImGui::Checkbox("Hide Front Faces", &hideFrontFaces);
+                model.SetHideFrontFaces(hideFrontFaces);
+
+                vec3 diffuseColor = model.GetDiffuse();
+                ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor);
+                model.SetDiffuse(diffuseColor);
+
                 ImGui::PopID();
             }
 
@@ -178,19 +195,6 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::DragFloat("Yaw", (float*)&yaw, 0.5, -100, 100);
             ImGui::DragFloat("Pitch", (float*)&pitch, 0.5, -100, 100);
-        }
-
-        if (ImGui::CollapsingHeader("Scene"))
-        {
-            if (ImGui::Button("Save scene"))
-            {
-                SaveScene();
-            }
-
-            if (ImGui::Button("Load Scene"))
-            {
-                LoadNewScene();
-            }
         }
     }
     ImGui::End();
@@ -298,6 +302,7 @@ void GuiLayer::RenderMainMenuBar()
             {
                 m_fluidRenderer->SetScene(Scene::CreateEmptyScene());
                 m_fluidRenderer->LoadScene();
+                m_sceneSerializer = SceneSerializer();
             }
 
             if (ImGui::MenuItem("Load Scene"))
@@ -309,12 +314,12 @@ void GuiLayer::RenderMainMenuBar()
             ImGui::Spacing();
             if (ImGui::MenuItem("Save Scene"))
             {
-
+                SaveScene();
             }
 
             if (ImGui::MenuItem("Save Scene As"))
             {
-                SaveScene();
+                SaveSceneAs();
             }
 
             ImGui::EndMenu();
@@ -371,10 +376,10 @@ void GuiLayer::LoadNewScene()
     auto exportScenePath = tinyfd_openFileDialog("Export Scene", nullptr, 1, acceptedFileTypes, "Scene files", 0);
     if (exportScenePath != nullptr)
     {
-        SceneSerializer ss = SceneSerializer(exportScenePath);
-        if (ss.Deserialize())
+        m_sceneSerializer = SceneSerializer(exportScenePath);
+        if (m_sceneSerializer.Deserialize())
         {
-            m_fluidRenderer->SetScene(ss.GetScene());
+            m_fluidRenderer->SetScene(m_sceneSerializer.GetScene());
             m_fluidRenderer->LoadScene();
         }
     }
@@ -409,7 +414,7 @@ void GuiLayer::LoadFluid()
     }
 }
 
-void GuiLayer::SaveScene()
+std::string GuiLayer::GetNewSceneFilenameDialog()
 {
     const char* acceptedFileTypes[1] = { "*.yml" };
     auto exportScenePath = tinyfd_saveFileDialog("Export Scene", nullptr, 1, acceptedFileTypes, "Scene files");
@@ -425,10 +430,32 @@ void GuiLayer::SaveScene()
         {
             exportScenePathStr += sceneFileExtension;
         }
+
+        return exportScenePathStr;
+    }
+    else return std::string();
+}
+
+void GuiLayer::SaveScene()
+{
+    if (m_sceneSerializer.GetFilePath().empty()) SaveSceneAs();
+    else
+    {
+        m_sceneSerializer.SetScene(m_fluidRenderer->m_scene);
+        m_sceneSerializer.Serialize();
+    }
+}
+
+void GuiLayer::SaveSceneAs()
+{
+    auto sceneFileName = GetNewSceneFilenameDialog();
+    if (!sceneFileName.empty()) 
+    {
+        std::cout << "rsrrs" << std::endl;
         Scene sc = m_fluidRenderer->m_scene;
         sc.camera = m_fluidRenderer->m_cameraController.GetCamera();
-        SceneSerializer ss = SceneSerializer(sc, exportScenePathStr);
-        ss.Serialize();
+        m_sceneSerializer = SceneSerializer(sc, sceneFileName);
+        m_sceneSerializer.Serialize();
     }
 }
 

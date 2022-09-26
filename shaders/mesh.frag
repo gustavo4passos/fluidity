@@ -113,7 +113,7 @@ void main()
             shadow = 1 - inShadow(fFragPosLightSpace, normal, lightDir);
         }
     }
-    fragColor     = (max(dot(normal, lightDir), 0.0) * shadow * lights[0].diffuse.xyz + lights[0].ambient.xyz) * color;
+    fragColor = (max(dot(normal, lightDir), 0.0) * shadow * lights[0].diffuse.xyz + lights[0].ambient.xyz) * uDiffuse;
 
     vec4 clipSpacePos = projectionMatrix * vec4(fFragEyePos, 1.0);
     fragDepth = vec4(fFragEyePos, 1.0).z;

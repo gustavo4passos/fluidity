@@ -211,7 +211,7 @@ bool FluidRenderer::LoadScene()
 
   ResetPlayback();
   Play();
-  
+
   return true;
 }
 
@@ -261,10 +261,10 @@ auto FluidRenderer::InitUniformBuffers() -> bool
   GLCall(glGenBuffers(1, &m_uniformBufferMaterial));
   GLCall(glGenBuffers(1, &m_uniformBufferLightMatrices));
 
-  constexpr int CAMERA_DATA_UB_INDEX = 0;
-  constexpr int LIGHTS_UB_INDEX = 1;
+  constexpr int CAMERA_DATA_UB_INDEX    = 0;
+  constexpr int LIGHTS_UB_INDEX         = 1;
   constexpr int LIGHT_MATRICES_UB_INDEX = 2;
-  constexpr int MATERIAL_UB_INDEX = 3;
+  constexpr int MATERIAL_UB_INDEX       = 3;
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
   GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraData), nullptr, GL_DYNAMIC_DRAW));
@@ -294,20 +294,20 @@ auto FluidRenderer::InitUniformBuffers() -> bool
   {
     if (!renderPassPair.second->SetUniformBuffer("CameraData", CAMERA_DATA_UB_INDEX))
     {
-      LOG_ERROR("Unable to set CameraData uniform buffer on " + renderPassPair.first);
+      LOG_WARNING("Unable to set CameraData uniform buffer on " + renderPassPair.first);
     }
 
     if (!renderPassPair.second->SetUniformBuffer("Lights", LIGHTS_UB_INDEX))
     {
-      LOG_ERROR("Unable to set Lights uniform buffer on " + renderPassPair.first);
+      LOG_WARNING("Unable to set Lights uniform buffer on " + renderPassPair.first);
     }
     if (!renderPassPair.second->SetUniformBuffer("LightMatrices", LIGHT_MATRICES_UB_INDEX))
     {
-      LOG_ERROR("Unable to set LightMatrices uniform buffer on " + renderPassPair.first);
+      LOG_WARNING("Unable to set LightMatrices uniform buffer on " + renderPassPair.first);
     }
     if (!renderPassPair.second->SetUniformBuffer("Material", MATERIAL_UB_INDEX))
     {
-      LOG_ERROR("Unable to set Material uniform buffer on " + renderPassPair.first);
+      LOG_WARNING("Unable to set Material uniform buffer on " + renderPassPair.first);
     }
 }
 
@@ -436,6 +436,7 @@ void FluidRenderer::SetUpPerFrameUniforms()
   compositionPassShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
   compositionPassShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
   compositionPassShader.SetUniform1f("uRefractionModifier", fluidParameters.refractionModifier);
+  compositionPassShader.SetUniform1i("uUseRefractionMask", filteringParameters.useRefractionMask ? 1 : 0);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
@@ -472,7 +473,9 @@ auto FluidRenderer::Render() -> void
     m_meshesShadowPass->Render();
     m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
   }
-
+  
+  // Set background clear color (comes from meshes rendering for now)
+  m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
   m_meshesPass->Render();
 
   GLuint depthTexture = 0;

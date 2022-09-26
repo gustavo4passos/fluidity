@@ -52,11 +52,28 @@ void MeshesPass::Render()
     m_shader->Bind();
     BindTextures();
 
-
+    // TODO: The per-model uniforms and context changes are acceptable here only because
+    // the number of models is admitted to be short
     for (auto& model : m_scene->models)
     {
+        if (!model.IsVisible()) continue;
+
+        if (model.GetHideFrontFaces()) 
+        {
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+        }
+        else
+        {
+            glDisable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+        }
+        
+        auto color = model.GetDiffuse();
         for (auto& mesh : model.GetMeshes())
         {
+            m_shader->SetUniform1i("uInvertNormals", model.GetHideFrontFaces() ? 1 : 0, true);
+            m_shader->SetUniform3f("uDiffuse", color.x, color.y, color.z, true);
             GLCall(glBindVertexArray(mesh.GetVao()));
             GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.GetIbo()));
             GLCall(glDrawElements(GL_TRIANGLES, mesh.GetIndices().size(), GL_UNSIGNED_INT, 
@@ -64,6 +81,7 @@ void MeshesPass::Render()
         }
     }
 
+    glDisable(GL_CULL_FACE);
     if (m_hasSkybox)
     {
         RenderSkybox(previousRenderState);
@@ -130,16 +148,6 @@ void MeshesPass::RemoveSkybox()
     if (m_hasSkybox) m_skybox.CleanUp();
     m_hasSkybox = false;
 }
-
-// void MeshesPass::RemoveModels()
-// {
-//     for (auto& m : m_models)
-//     {
-//         m.CleanUp();
-//     }
-
-//     m_models.clear();
-// }
 
 Skybox& MeshesPass::GetSkybox()
 {

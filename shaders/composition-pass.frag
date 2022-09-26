@@ -94,6 +94,7 @@ uniform int   u_TransparentFluid;
 uniform float uMinShadowBias;
 uniform float uMaxShadowBias;
 uniform float uRefractionModifier;
+uniform int uUseRefractionMask;
 
 // in/out
 in vec2  f_TexCoord;
@@ -249,9 +250,26 @@ void main()
     //Color Attenuation from Thickness (Beer's Law)
     vec3 colorAttennuation = computeAttennuation(thickness * 5.0f);
     colorAttennuation = mix(vec3(1, 1, 1), colorAttennuation, u_AttennuationConstant);
+    vec3 refractionDir = refract(-viewer, N, 1.0 / refractiveIndex);
+    vec2 refractionDisplacement = refractionDir.xy * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
 
-    vec3 refractionDir   = refract(-viewer, N, 1.0 / refractiveIndex);
-    vec3 refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + (refractionDir.xy * uRefractionModifier) * thickness * u_AttennuationConstant * 0.1f).xyz;
+    // GPU Gems 2 - Generic Refractions tweak for refractions artefacts
+    if (uUseRefractionMask == 1)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            float fluidDepthAtRefractionPoint = texture(u_DepthTex, f_TexCoord + refractionDisplacement).r;
+            float solidDepthAtRefractionPoint = texture(u_SolidDepthMap, f_TexCoord + refractionDisplacement).r;
+            if ((fluidDepthAtRefractionPoint > 0 || fluidDepthAtRefractionPoint < -1000.f) ||
+                solidDepthAtRefractionPoint >= fluidDepthAtRefractionPoint)
+            {
+                refractionDisplacement *= 0.5;
+            }
+            else break;
+        }
+    }
+
+    vec3 refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + refractionDisplacement).xyz;
 
     fresnelRatio = mix(fresnelRatio, 1.0, u_ReflectionConstant);
     vec3 finalColor = (mix(refractionColor, reflectionColor, fresnelRatio) + specular * material.specular.xyz) * shadowColor;

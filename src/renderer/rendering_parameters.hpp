@@ -9,6 +9,7 @@ struct FilteringParameters
   int filterSize;
   int maxFilterSize;
   bool gammaCorrection; // TODO: This should not be here. More like "post processing parameters"
+  bool useRefractionMask;
 };
 
 struct FluidParameters

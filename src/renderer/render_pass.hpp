@@ -14,6 +14,8 @@ struct RenderState
   GLenum blendSourceFactor      = GL_ONE;
   GLenum blendDestinationFactor = GL_ZERO;
   Vec4 clearColor               = { 0.f, 0.f, 0.f, 1.f };
+  bool cullFaceEnabled          = false;
+  GLenum cullFaceMode           = GL_BACK;
 };
 
 class RenderPass

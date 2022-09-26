@@ -109,8 +109,6 @@ int Fluid::GetNumberOfParticles(int frame)
 
 int Fluid::CalcNumberOfParticles(const cnpy::NpyArray& particleData)
 {
-    if (GetNumberOfFrames() == 0) return 0;
-    
     const int NUM_COMPONENTS = 3;
     const int COMPONENT_SIZE = particleData.word_size; // Bytes
     return particleData.num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
