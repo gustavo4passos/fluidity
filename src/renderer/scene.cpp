@@ -12,10 +12,11 @@ struct YAML::convert<fluidity::FilteringParameters>
     {
         if (!node.IsSequence() || node.size() != 5) return false;
 
-        fp.nIterations     = node[0].as<int>();
-        fp.filterSize      = node[1].as<int>();
-        fp.maxFilterSize   = node[2].as<int>();
-        fp.gammaCorrection = node[3].as<bool>();
+        fp.nIterations       = node[0].as<int>();
+        fp.filterSize        = node[1].as<int>();
+        fp.maxFilterSize     = node[2].as<int>();
+        fp.gammaCorrection   = node[3].as<bool>();
+        fp.useRefractionMask = node[4].as<bool>();
         return true;
     }
 };
@@ -130,7 +131,8 @@ YAML::Emitter& operator << (YAML::Emitter& out, const FilteringParameters& filte
 {
     const FilteringParameters& fp = filteringParameters;
     out << YAML::Flow;
-    out << YAML::BeginSeq << fp.nIterations << fp.filterSize << fp.maxFilterSize << fp.gammaCorrection << fp.gammaCorrection;
+    out << YAML::BeginSeq << fp.nIterations << fp.filterSize << fp.maxFilterSize << 
+        fp.gammaCorrection << fp.useRefractionMask;
     out << YAML::EndSeq;
 
     return out;
@@ -150,6 +152,15 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Vec4& vec)
 {
     out << YAML::Flow;
     out << YAML::BeginSeq << vec.x << vec.y << vec.z << vec.w;
+    out << YAML::EndSeq;
+
+    return out;
+}
+
+YAML::Emitter& operator << (YAML::Emitter& out, const vec3& vec)
+{
+    out << YAML::Flow;
+    out << YAML::BeginSeq << vec.x << vec.y << vec.z;
     out << YAML::EndSeq;
 
     return out;
@@ -224,11 +235,12 @@ void SceneSerializer::Serialize()
     using namespace YAML;
     Emitter out;
     out << BeginMap;
-        out << Key << "Version" << Value << SERIALIZER_VERSION;
+        out << Key << "Version"    << Value << SERIALIZER_VERSION;
+        out << Key << "ClearColor" << Value << m_scene.clearColor;
         out << Key << "FilteringParameters" << m_scene.filteringParameters;
-        out << Key << "FluidParameters" << m_scene.fluidParameters;
-        out << Key << "LightingParameters" << m_scene.lightingParameters;
-        out << Key << "FluidMaterial" << m_scene.fluidMaterial;
+        out << Key << "FluidParameters"     << m_scene.fluidParameters;
+        out << Key << "LightingParameters"  << m_scene.lightingParameters;
+        out << Key << "FluidMaterial"       << m_scene.fluidMaterial;
 
         out << Key << "Lights";
         out << BeginSeq;
@@ -315,6 +327,11 @@ bool SceneSerializer::Deserialize()
         }
     }
 
+    if (root["ClearColor"] && root["ClearColor"].IsSequence())
+    {
+        sc.clearColor = root["ClearColor"].as<Vec4>();
+    }
+
     if (root["Skybox"])
     {
         sc.skyboxPath = GetAbsolutePathRelativeToScene(root["Skybox"].as<std::string>());
@@ -334,12 +351,14 @@ bool SceneSerializer::Deserialize()
 }
 
 
-void SceneSerializer::SerializeModel (YAML::Emitter& out, const Model& m)
+void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
 {
     using namespace YAML;
     out << BeginMap;
         out << Key << "filePath" << Value << GetRelativePathFromSceneFile(m.GetFilePath());
         out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
+        out << Key << "diffuseColor" << Value << m.GetDiffuse();
+        out << Key << "hideFrontFaces" << Value << m.GetHideFrontFaces();
     out << EndMap;
 }
 
@@ -391,6 +410,18 @@ bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
     auto filePath = GetAbsolutePathRelativeToScene(node["filePath"].as<std::string>());
     auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
     m = Model(filePath, genSmoothNormals);
+
+    if (node["diffuseColor"])
+    {
+        auto color = node["diffuseColor"].as<vec3>();
+        m.SetDiffuse(color);
+    }
+
+    if (node["hideFrontFaces"])
+    {
+        auto hideFrontFaces = node["hideFrontFaces"].as<bool>();
+        m.SetHideFrontFaces(hideFrontFaces);
+    }
 
     return true;
 }

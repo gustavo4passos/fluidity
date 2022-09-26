@@ -22,21 +22,26 @@ struct Scene
     std::vector<PointLight> lights = {};
     std::vector<Model> models;
     std::string skyboxPath;
+    Vec4 clearColor; 
 
     static Scene CreateEmptyScene() 
     {
         return {
-            {},
-            { 4, 7, 100, false },
-            { 0.25, true, 0.0625 },
-            { 0.00100000005, 0.00999999978, 0.5, true, true },
-            { { 17, 8, 0.5 }},
+            {}, // Fluid
+            { 4, 7, 100, false }, // Filtering parameters
+            { 0.25, true, 0.0625 }, // Fluid parameters
+            { 0.00100000005, 0.00999999978, 0.5, true, true }, // Lighting paremeters
+            { { 17, 8, 0.5 } }, // Camera
             {
                 { 0.2, 0.2, 0.2, 0.2 },
                 { 1, 1, 1, 1 },
                 { 1, 1, 1, 1 },
                 350.f,
-            }
+            }, // Material
+            { }, // Lights
+            { }, // Models
+            { }, // Skybox path
+            { .5f, .5f, .5f, 1.f }
         };
     }
 };
@@ -45,14 +50,17 @@ struct Scene
 class SceneSerializer
 {
 public:
+    SceneSerializer() = default;
     SceneSerializer(const std::string& filePath);
     SceneSerializer(Scene scene, const std::string& filePath);
 
-    
     bool Deserialize();
     void Serialize();
     void SetScene(const Scene& scene) { m_scene = scene; }
     const Scene& GetScene() { return m_scene; }
+
+    const std::string& GetFilePath() const { return m_filePath; }
+    void SetFilePath(const std::string filePath) { m_filePath = filePath; }
 
     static constexpr char* SERIALIZER_VERSION = "1.0";
     static constexpr char* SCENE_FILE_EXTENSION = ".yml";
