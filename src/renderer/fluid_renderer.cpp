@@ -26,7 +26,8 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_windowHeight(windowHeight),
   m_aspectRatio((float) windowWidth / windowHeight),
   m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
-  m_currentFrame(0)
+  m_currentFrame(0),
+  m_lightModel("../../assets/cube.obj")
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -153,6 +154,11 @@ auto FluidRenderer::Init() -> bool
     auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
     meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
   }
+
+  // Load light model - Represents the light in the scene
+  m_lightModel.Load();
+  m_lightModel.GetMaterial().emissive = true;
+  m_lightModel.SetScale({ 0.2f, 0.2f, 0.2f });
 
   if (!LoadScene()) return false;
   if (!InitUniformBuffers()) return false;
@@ -284,8 +290,8 @@ auto FluidRenderer::InitUniformBuffers() -> bool
     0, sizeof(LightMatrix) * NUM_TOTAL_LIGHTS);
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
-  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(Material), nullptr, GL_STATIC_DRAW));
-  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, MATERIAL_UB_INDEX, m_uniformBufferMaterial, 0, sizeof(Material)));
+  GLCall(glBufferData(GL_UNIFORM_BUFFER, sizeof(UbMaterial), nullptr, GL_STATIC_DRAW));
+  GLCall(glBindBufferRange(GL_UNIFORM_BUFFER, MATERIAL_UB_INDEX, m_uniformBufferMaterial, 0, sizeof(UbMaterial)));
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
@@ -317,7 +323,7 @@ auto FluidRenderer::InitUniformBuffers() -> bool
 auto FluidRenderer::UploadMaterial() -> void
 {
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferMaterial));
-  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Material), &m_scene.fluidMaterial));
+  GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(UbMaterial), &m_scene.fluidMaterial));
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 
@@ -474,9 +480,23 @@ auto FluidRenderer::Render() -> void
     m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
   }
   
-  // Set background clear color (comes from meshes rendering for now)
+  // Places light model in the scene
+  if (m_scene.lightingParameters.showLightsOnScene)
+  {
+    // Positions light model in the same position as the light, and set color accordingly
+    auto lightPos = m_scene.lights[0].position;
+    auto lightColor = m_scene.lights[0].diffuse;
+    m_lightModel.SetTranslation({ lightPos.x, lightPos.y, lightPos.z });
+    m_lightModel.GetMaterial().diffuse = { lightColor.x, lightColor.y, lightColor.z };
+    m_scene.models.push_back(m_lightModel);
+  }
+
+  // Set background clear color (comes from meshes rendering, for now)
   m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
   m_meshesPass->Render();
+
+  // Remove light model from scene so it does not affect other passes
+  if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
 
   GLuint depthTexture = 0;
   if (m_scene.fluid.GetNumberOfFrames() > 0)
@@ -533,14 +553,25 @@ auto FluidRenderer::UploadCameraData() -> void
 
   auto view = m_cameraController.GetCamera().GetViewMatrix();
   auto projection = m_cameraController.GetCamera().GetProjectionMatrix();
+  glm::vec3 position = m_cameraController.GetCamera().GetPosition();
+  glm::vec4 positionV4 = glm::vec4(position, 1.0);
 
+  // View matrix - Offset 0
   GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view)));
+  // Projection matrix - Offset 1
   GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), 
         glm::value_ptr(projection)));
+  // Inverse view - Offset 2
   GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2,  sizeof(glm::mat4), 
         glm::value_ptr(glm::inverse(view))));
+  // Inverse projection - Offset 3
   GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 3,  sizeof(glm::mat4), 
         glm::value_ptr(glm::inverse(projection))));
+  // Shadow matrix - Offset 4
+  // ... Skip ...
+  // Camera position - Offset 5
+  glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 5, sizeof(glm::vec4), glm::value_ptr(
+    positionV4));
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 }
 

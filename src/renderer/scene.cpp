@@ -40,13 +40,18 @@ struct YAML::convert<fluidity::LightingParameters>
 {
     static bool decode(const YAML::Node& node, fluidity::LightingParameters& lp)
     {
-        if (!node.IsSequence() || node.size() != 5) return false;
+        if (!node.IsSequence() || node.size() < 5) return false;
 
-        lp.minShadowBias    = node[0].as<float>();
-        lp.maxShadowBias    = node[1].as<float>();
-        lp.shadowIntensity  = node[2].as<float>();
-        lp.usePcf           = node[3].as<bool>();
-        lp.renderShadows    = node[4].as<bool>();
+        lp.minShadowBias     = node[0].as<float>();
+        lp.maxShadowBias     = node[1].as<float>();
+        lp.shadowIntensity   = node[2].as<float>();
+        lp.usePcf            = node[3].as<bool>();
+        lp.renderShadows     = node[4].as<bool>();
+        
+        if (node.size() > 5) 
+        {
+            lp.showLightsOnScene = node[5].as<bool>();
+        }
         return true;
     }
 };
@@ -97,9 +102,9 @@ struct YAML::convert<PointLight>
 };
 
 template<>
-struct YAML::convert<Material>
+struct YAML::convert<UbMaterial>
 {
-    static bool decode(const YAML::Node& node, Material& m)
+    static bool decode(const YAML::Node& node, UbMaterial& m)
     {
         if (!node.IsMap()) return false;
 
@@ -107,6 +112,22 @@ struct YAML::convert<Material>
         m.diffuse   = node["diffuse"].as<Vec4>();
         m.specular  = node["specular"].as<Vec4>();
         m.shininess = node["shininess"].as<float>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<Material>
+{
+    static bool decode(const YAML::Node& node, Material& m)
+    {
+        if (!node.IsMap()) return false;
+
+        m.ambient   = node["ambient"].as<vec3>();
+        m.diffuse   = node["diffuse"].as<vec3>();
+        m.specular  = node["specular"].as<vec3>();
+        m.shininess = node["shininess"].as<float>();
+        m.emissive  = node["emissive"].as<bool>();
         return true;
     }
 };
@@ -168,10 +189,10 @@ YAML::Emitter& operator << (YAML::Emitter& out, const vec3& vec)
 
 YAML::Emitter& operator << (YAML::Emitter& out, const LightingParameters& lightingParameters)
 {
-    const LightingParameters& lp = lightingParameters;
+    const LightingParameters& lp = lightingParameters; 
     out << YAML::Flow;
     out << YAML::BeginSeq << lp.minShadowBias << lp.maxShadowBias << lp.shadowIntensity 
-        << lp.usePcf << lp.renderShadows;
+        << lp.usePcf << lp.renderShadows << lp.showLightsOnScene;
     out << YAML::EndSeq;
 
     return out;
@@ -189,6 +210,18 @@ YAML::Emitter& operator << (YAML::Emitter& out, const PointLight& light)
     return out;
 }
 
+YAML::Emitter& operator << (YAML::Emitter& out, const UbMaterial& material)
+{
+    using namespace YAML;
+    out << BeginMap;
+        out << Key << "ambient"   << material.ambient;
+        out << Key << "diffuse"   << material.diffuse;
+        out << Key << "specular"  << material.specular;
+        out << Key << "shininess" << material.shininess;
+    out << EndMap;
+    return out;
+}
+
 YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
 {
     using namespace YAML;
@@ -197,6 +230,7 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
         out << Key << "diffuse"   << material.diffuse;
         out << Key << "specular"  << material.specular;
         out << Key << "shininess" << material.shininess;
+        out << Key << "emissive"  << material.emissive;
     out << EndMap;
     return out;
 }
@@ -299,7 +333,7 @@ bool SceneSerializer::Deserialize()
 
     if (root["FluidMaterial"])
     {
-        sc.fluidMaterial = root["FluidMaterial"].as<Material>();
+        sc.fluidMaterial = root["FluidMaterial"].as<UbMaterial>();
     }
 
     if (root["Camera"])
@@ -355,10 +389,12 @@ void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
 {
     using namespace YAML;
     out << BeginMap;
-        out << Key << "filePath" << Value << GetRelativePathFromSceneFile(m.GetFilePath());
+        out << Key << "filePath"         << Value << GetRelativePathFromSceneFile(m.GetFilePath());
         out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
-        out << Key << "diffuseColor" << Value << m.GetDiffuse();
-        out << Key << "hideFrontFaces" << Value << m.GetHideFrontFaces();
+        out << Key << "material"         << Value << m.GetMaterialConst();
+        out << Key << "hideFrontFaces"   << Value << m.GetHideFrontFaces();
+        out << Key << "translation"      << Value << m.GetTranslation();
+        out << Key << "scale"            << Value << m.GetScale();
     out << EndMap;
 }
 
@@ -411,16 +447,28 @@ bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
     auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
     m = Model(filePath, genSmoothNormals);
 
-    if (node["diffuseColor"])
+    if (node["material"])
     {
-        auto color = node["diffuseColor"].as<vec3>();
-        m.SetDiffuse(color);
+        auto material = node["material"].as<Material>();
+        m.GetMaterial() = material;
     }
 
     if (node["hideFrontFaces"])
     {
         auto hideFrontFaces = node["hideFrontFaces"].as<bool>();
         m.SetHideFrontFaces(hideFrontFaces);
+    }
+
+    if (node["translation"])
+    {
+        auto translation = node["translation"].as<vec3>();
+        m.SetTranslation(translation);
+    }
+
+    if (node["scale"])
+    {
+        auto scale = node["scale"].as<vec3>();
+        m.SetScale(scale);
     }
 
     return true;

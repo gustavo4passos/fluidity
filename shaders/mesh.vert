@@ -40,7 +40,7 @@ layout(std140) uniform LightMatrices
 };
 
 uniform mat4 projection;
-uniform mat4 view;
+uniform mat4 model;
 
 out vec3 fFragPos;
 out vec4 fFragPosLightSpace;
@@ -52,14 +52,14 @@ uniform int uInvertNormals;
 
 void main()
 {
-    gl_Position = projectionMatrix * viewMatrix * vec4(vPos, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * model * vec4(vPos, 1.0);
 
     // This 2x + 1 expression is just for optimization. It will return 1 when uInvertNormals is 0 
     // (and keep the normals intact) or -1 when uInvertNormals is 1 (this inverting the)
     // normals.
     // This avoids branching.
     fNormal = (-2 * uInvertNormals + 1) * vNormal;  
-    fFragPos = vPos;
-    fFragPosLightSpace = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * vec4(vPos, 1.0);
-    fFragEyePos = (viewMatrix * vec4(vPos, 1.0)).xyz;
+    fFragPos = (model * vec4(vPos, 1.0)).xyz;
+    fFragPosLightSpace = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * model * vec4(vPos, 1.0);
+    fFragEyePos = (viewMatrix * model * vec4(vPos, 1.0)).xyz;
 }

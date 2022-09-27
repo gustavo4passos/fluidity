@@ -190,8 +190,7 @@ void main()
     vec3 position = uvToEye(f_TexCoord, eyeDepth);
     vec3 viewer   = normalize(-position.xyz);
 
-    // fluidity - Makes all lights directional 
-    vec3  lightDir = normalize(vec3(viewMatrix * lights[lightID].position));
+    vec3  lightDir = normalize(vec3(viewMatrix * lights[lightID].position) - position);
     vec3  H        = normalize(lightDir + viewer);
     float specular = pow(max(0.0f, dot(H, N)), material.shininess);
     float diffuse  = max(0.0f, dot(lightDir, N)) * 1.0f;
@@ -256,7 +255,7 @@ void main()
     // GPU Gems 2 - Generic Refractions tweak for refractions artefacts
     if (uUseRefractionMask == 1)
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 5; i++)
         {
             float fluidDepthAtRefractionPoint = texture(u_DepthTex, f_TexCoord + refractionDisplacement).r;
             float solidDepthAtRefractionPoint = texture(u_SolidDepthMap, f_TexCoord + refractionDisplacement).r;

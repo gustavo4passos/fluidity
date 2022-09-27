@@ -78,6 +78,7 @@ private:
 
   static constexpr int NUM_TOTAL_LIGHTS = 8;
   Scene m_scene;
+  Model m_lightModel;
 
   unsigned m_windowWidth;
   unsigned m_windowHeight;

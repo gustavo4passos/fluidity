@@ -66,8 +66,10 @@ void GuiLayer::RenderParametersWindow()
     {
         if (ImGui::CollapsingHeader("Lighting"))
         {
+            auto& lightingParameters = m_fluidRenderer->m_scene.lightingParameters;
             auto& light = m_fluidRenderer->m_scene.lights[0];
             ImGui::Text("Light");
+            ImGui::Checkbox("Show Lights on Scene", &lightingParameters.showLightsOnScene);
             // TODO: The ## light identifier is used to avoid id conflicts on imgui, since it will create a hash
             // using the name of the window and the ## identifier.
             // However, it won't work when multiple lights are at play
@@ -75,17 +77,21 @@ void GuiLayer::RenderParametersWindow()
             ImGui::ColorEdit3("Diffuse##light", (float*)&light.diffuse);
             ImGui::ColorEdit3("Ambient##light", (float*)&light.ambient);
             ImGui::ColorEdit3("Specular##light", (float*)&light.specular);
-
-            auto& lightingParameters = m_fluidRenderer->m_scene.lightingParameters;
             ImGui::Separator();
             ImGui::Spacing();
+            ImGui::Spacing();
+
+            ImGui::Text("Shadows");
             ImGui::Checkbox("Render shadows", &lightingParameters.renderShadows);
             ImGui::SameLine();
             ImGui::Checkbox("PCF", &lightingParameters.usePcf);
             ImGui::Spacing();
-            ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias, 0.00001f, 0.f, 1.f);
-            ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias, 0.00001f, 0.f, 1.f);
+            ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias,   0.00001f, 0.f, 1.f);
+            ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias,   0.00001f, 0.f, 1.f);
             ImGui::DragFloat("Shadow Intensity", &lightingParameters.shadowIntensity, 0.005f, 0.f, 1.f);
+
+            ImGui::Spacing();
+            ImGui::Spacing();
         }
 
         if (ImGui::CollapsingHeader("Fluid"))
@@ -164,9 +170,20 @@ void GuiLayer::RenderParametersWindow()
                 ImGui::Checkbox("Hide Front Faces", &hideFrontFaces);
                 model.SetHideFrontFaces(hideFrontFaces);
 
-                vec3 diffuseColor = model.GetDiffuse();
-                ImGui::ColorEdit3("Diffuse", (float*)&diffuseColor);
-                model.SetDiffuse(diffuseColor);
+                vec3 translation = model.GetTranslation();
+                ImGui::DragFloat3("Translation", (float*)&translation, 0.05, -4000, 4000);
+                model.SetTranslation(translation);
+                ImGui::Spacing();
+
+                vec3 scale = model.GetScale();
+                float scale1f = scale.x;
+                ImGui::DragFloat("Scale", &scale1f, 0.05, 0.05, 300);
+                model.SetScale({ scale1f, scale1f, scale1f });
+
+                auto& material = model.GetMaterial();
+                ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
+                ImGui::ColorEdit3("Specular", (float*)&material.specular);
+                ImGui::SliderFloat("Shininess", &material.shininess, 0.01, 3000);
 
                 ImGui::PopID();
             }
@@ -504,7 +521,7 @@ void GuiLayer::SetDefaultThemeColors()
     colors[ImGuiCol_FrameBgActive]          = ImVec4(0.21f, 0.21f, 0.21f, 1.f);
     colors[ImGuiCol_TitleBg]                = ImVec4(0.258f, 0.258f, 0.258f, 1.00f);
     colors[ImGuiCol_TitleBgActive]          = ImVec4(0.27f, 0.278, 0.27f, 1.00f);
-    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(1.24f, 0.24f, 0.24f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed]       = ImVec4(0.24f, 0.24f, 0.24f, 1.00f);
     colors[ImGuiCol_Tab]                    = ImVec4(0.27f, 0.27f, 0.27f, 1.f);
     colors[ImGuiCol_TabActive]              = ImVec4(0.325f, 0.325f, 0.325f, 1.f);
     colors[ImGuiCol_TabHovered]             = ImVec4(0.309f, 0.309f, 0.309f, 1.f);

@@ -16,9 +16,10 @@ layout(std140) uniform LightMatrices
 };
 
 uniform mat4 uLightMatrix;
+uniform mat4 model;
 
 void main()
 {
-    fFragPos = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * vec4(vPos, 1.0);
+    fFragPos = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * model * vec4(vPos, 1.0);
     gl_Position = fFragPos;
 }

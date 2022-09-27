@@ -18,7 +18,7 @@ struct Scene
     FluidParameters fluidParameters;
     LightingParameters lightingParameters;
     Camera camera;
-    Material fluidMaterial;
+    UbMaterial fluidMaterial;
     std::vector<PointLight> lights = {};
     std::vector<Model> models;
     std::string skyboxPath;
