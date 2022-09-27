@@ -54,11 +54,19 @@ struct LightMatrix
   Mat4 projectionMatrix;
 };
 
-struct Material {
+struct UbMaterial {
   Vec4 ambient;
   Vec4 diffuse;
   Vec4 specular;
   float shininess;
+};
+
+struct Material {
+  vec3 ambient;
+  vec3 diffuse;
+  vec3 specular;
+  float shininess;
+  bool emissive;
 };
 
 #pragma pack(pop)

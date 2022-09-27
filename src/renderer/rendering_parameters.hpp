@@ -27,6 +27,7 @@ struct LightingParameters
   float shadowIntensity;
   bool  usePcf;
   bool  renderShadows;
+  bool  showLightsOnScene;
 };
 
 }

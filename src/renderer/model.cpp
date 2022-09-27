@@ -7,7 +7,14 @@
 
 Model::Model(const std::string& filePath, bool genSmoothNormals)
     : m_filePath(filePath),
-    m_genSmoothNormals(genSmoothNormals)
+    m_genSmoothNormals(genSmoothNormals),
+    m_material { 
+        { 0.1f, 0.1f, 0.1f },
+        { 0.4f, 0.4f, 0.4f },
+        { 1.f,  1.f,  1.f },
+        32.f,
+        false
+        }
 { /* */ }
 
 bool Model::Load()

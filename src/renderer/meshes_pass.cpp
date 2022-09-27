@@ -1,6 +1,7 @@
 #pragma once
 #include "renderer/meshes_pass.hpp"
 #include "utils/glcall.h"
+#include <glm/gtc/type_ptr.hpp>
 #include <cassert>
 
 namespace fluidity
@@ -69,11 +70,28 @@ void MeshesPass::Render()
             glCullFace(GL_BACK);
         }
         
-        auto color = model.GetDiffuse();
+        const auto& material = model.GetMaterial();
+        auto diffuse = material.diffuse;
+        auto specular = material.specular;
+        m_shader->SetUniform1i("uInvertNormals", model.GetHideFrontFaces() ? 1 : 0, true);
+        m_shader->SetUniform3f("uDiffuse", diffuse.x, diffuse.y, diffuse.z, true);
+        m_shader->SetUniform3f("uSpecular", specular.x, specular.y, specular.z, true);
+        m_shader->SetUniform1f("uShininess", material.shininess, true);
+        m_shader->SetUniform1i("uEmissive", material.emissive ? 1 : 0, true);
+
+        vec3 modelTranslation = model.GetTranslation();
+        vec3 modelScale       = model.GetScale();
+
+        glm::mat4 modelMatrix = modelMatrix = glm::translate(glm::mat4(1.f), glm::vec3(modelTranslation.x,
+            modelTranslation.y, modelTranslation.z));
+        modelMatrix = glm::scale(modelMatrix, glm::vec3(modelScale.x, 
+            modelScale.y, modelScale.z));
+        
+
+        m_shader->SetUniformMat4("model", glm::value_ptr(modelMatrix), true);
+
         for (auto& mesh : model.GetMeshes())
         {
-            m_shader->SetUniform1i("uInvertNormals", model.GetHideFrontFaces() ? 1 : 0, true);
-            m_shader->SetUniform3f("uDiffuse", color.x, color.y, color.z, true);
             GLCall(glBindVertexArray(mesh.GetVao()));
             GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.GetIbo()));
             GLCall(glDrawElements(GL_TRIANGLES, mesh.GetIndices().size(), GL_UNSIGNED_INT, 

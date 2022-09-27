@@ -41,8 +41,11 @@ uniform float uMaxShadowBias;
 uniform float uShadowIntensity;
 uniform int   uUsePcf;
 
-// Color 
-uniform vec3 uDiffuse;
+// Material
+uniform vec3  uDiffuse;
+uniform vec3  uSpecular;
+uniform float uShininess;
+uniform int   uEmissive;
 
 float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 {
@@ -70,7 +73,7 @@ float inShadow(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 float inShadowPCF(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 {
     
-    float shadowBias = max(uMaxShadowBias * (1 - dot(fragNormal, lightDir)), uMinShadowBias);
+    float shadowBias = max(uMaxShadowBias * (1 - dot(fragNormal, -lightDir)), uMinShadowBias);
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     vec3 texCoords = projCoords * 0.5 + 0.5;
     
@@ -92,15 +95,21 @@ float inShadowPCF(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 
 void main()
 {
-    vec3 color = vec3(233.0 / 255.0, 116.0 / 255.0, 81.0 / 255.0);
-    float ambient = 0.2;
+    // vec3 color = vec3(233.0 / 255.0, 116.0 / 255.0, 81.0 / 255.0);
+    // float ambient = 0.2;
     // fragColor = vec3(149.0 / 255.0, 69.0 / 255.0, 53.0 / 255.0); // Chestnut color
     vec3 normal   = normalize(fNormal);
     // Point light
     // vec3 lightDir = normalize(lights[0].position.xyz - fFragPos);
-    
-    // Directional light
-    vec3 lightDir = normalize(lights[0].position.xyz);
+
+    vec3 lightDir = normalize(fFragPos - lights[0].position.xyz);
+    vec3 viewDir = normalize(camPosition.xyz - fFragPos);
+    vec3 halfwayDir = normalize(viewDir - lightDir);
+
+    float specularStrength = 1;
+    vec3 reflectDir = reflect(lightDir, normal);
+    vec3 specular = pow(max(dot(viewDir, reflectDir), 0), uShininess) * uSpecular * lights[0].diffuse.xyz;
+
     float shadow = 1;
     if (uHasShadows == 1)
     {
@@ -113,7 +122,15 @@ void main()
             shadow = 1 - inShadow(fFragPosLightSpace, normal, lightDir);
         }
     }
-    fragColor = (max(dot(normal, lightDir), 0.0) * shadow * lights[0].diffuse.xyz + lights[0].ambient.xyz) * uDiffuse;
+
+    vec3 diffuse = max(dot(normal, -lightDir), 0.0) * lights[0].diffuse.xyz * uDiffuse;
+    vec3 ambient = uDiffuse * lights[0].ambient.xyz;
+    fragColor = (diffuse + specular) * shadow + ambient;
+
+    // If material is emissive, just show it's diffuse color.
+    // Otherwise, use the normal lighting calculations
+    // TODO: If material is emissive, the whole lighting calculation can be ignored.
+    fragColor = (-1 * uEmissive + 1) * fragColor + uEmissive * uDiffuse;
 
     vec4 clipSpacePos = projectionMatrix * vec4(fFragEyePos, 1.0);
     fragDepth = vec4(fFragEyePos, 1.0).z;

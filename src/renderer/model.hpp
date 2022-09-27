@@ -17,11 +17,8 @@ public:
     std::vector<Mesh>& GetMeshes() { return m_meshes; }
     const std::string& GetFilePath() const { return m_filePath; }
 
-    void SetPosition(const vec3& position) { m_position = position; }
-    const vec3& GetPosition() const { return m_position; }
-
-    const vec3& GetDiffuse() const { return m_diffuseColor; }
-    void SetDiffuse(const vec3& diffuse) { m_diffuseColor = diffuse; }
+    void SetTranslation(const vec3& translation) { m_translation = translation; }
+    const vec3& GetTranslation() const { return m_translation; }
 
     bool IsVisible() const { return m_isVisible; }
     void SetIsVisible(bool visible) { m_isVisible = visible; }
@@ -29,11 +26,22 @@ public:
     bool GetHideFrontFaces() const { return m_hideFrontFaces; }
     void SetHideFrontFaces(bool hide) { m_hideFrontFaces = hide; }
 
+    // TODO: GetMaterialConst is needed when calling GetMaterial from a
+    // const Material&. However, this is not very consistent with the rest
+    // of the codebase (which usually uses Getters and Setters)
+    Material& GetMaterial() { return m_material; }
+    const Material& GetMaterialConst() const { return m_material; }
+    
+    const vec3& GetScale() const { return m_scale; }
+    void SetScale(const vec3& scale) { m_scale = scale; }
+
 private:
-    vec3 m_position;
-    vec3 m_diffuseColor   = { 0.4f, 0.4f, 0.4f };
+    Material m_material;
     bool m_isVisible      = true;
     bool m_hideFrontFaces = false;
+
+    vec3 m_translation    = { 0.f, 0.f, 0.f };
+    vec3 m_scale          = { 1.f, 1.f, 1.f };
 
     std::string m_filePath;
     std::vector<Mesh> m_meshes;
