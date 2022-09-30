@@ -252,9 +252,10 @@ void main()
     vec3 refractionDir = refract(-viewer, N, 1.0 / refractiveIndex);
     vec2 refractionDisplacement = refractionDir.xy * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
 
-    // GPU Gems 2 - Generic Refractions tweak for refractions artefacts
+    // GPU Gems 2 - Refraction mask
     if (uUseRefractionMask == 1)
     {
+        bool validDisplacement = false;
         for (int i = 0; i < 5; i++)
         {
             float fluidDepthAtRefractionPoint = texture(u_DepthTex, f_TexCoord + refractionDisplacement).r;
@@ -264,7 +265,13 @@ void main()
             {
                 refractionDisplacement *= 0.5;
             }
-            else break;
+            else
+            {
+                validDisplacement = true;
+                break;
+            }
+
+            if (!validDisplacement) refractionDisplacement = vec2(0);
         }
     }
 

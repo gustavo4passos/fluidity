@@ -82,17 +82,19 @@ Shader& RenderPass::GetShader()
   return *m_shader;
 }
 
-void RenderPass::SetInputTexture(GLuint texture, int slot)
+void RenderPass::SetInputTexture(const TextureBind& textureBind)
 {
-  m_textureBinds[slot] = texture;
+  m_textureBinds[textureBind.slot] = textureBind;
 }
 
 void RenderPass::BindTextures()
 {
- for (auto& tPair : m_textureBinds)
+ for (const auto& tPair : m_textureBinds)
   {
-    GLCall(glActiveTexture(GL_TEXTURE0 + tPair.first));
-    GLCall(glBindTexture(GL_TEXTURE_2D, tPair.second));
+    GLenum target = tPair.second.type == TextureType::Texture2D ? GL_TEXTURE_2D : 
+      GL_TEXTURE_CUBE_MAP;
+    GLCall(glActiveTexture(GL_TEXTURE0 + tPair.second.slot));
+    GLCall(glBindTexture(target, tPair.second.id));
   }
 }
 

@@ -344,6 +344,15 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     depthPassShader.Unbind(); 
   }
 
+  // Meshes pass -> Init uniforms
+  {
+    auto& meshesPassSahder = m_meshesPass->GetShader();
+    meshesPassSahder.Bind();
+    meshesPassSahder.SetUniform1i("uShadowMap", 0);
+    meshesPassSahder.SetUniform1i("uSkybox", 1);
+    meshesPassSahder.Unbind(); 
+  }
+
   // Thickness pass -> Init uniforms, set up render state
   {
 
@@ -491,6 +500,10 @@ auto FluidRenderer::Render() -> void
     m_scene.models.push_back(m_lightModel);
   }
 
+  if (m_meshesPass->HasSkybox()) m_meshesPass->SetInputTexture({ m_meshesPass->GetSkybox()
+    .GetTextureID(), 1, TextureType::Cubemap });
+  else m_meshesPass->SetInputTexture({ 0, 1, TextureType::Cubemap });
+
   // Set background clear color (comes from meshes rendering, for now)
   m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
   m_meshesPass->Render();
@@ -520,12 +533,12 @@ auto FluidRenderer::Render() -> void
 
     m_normalPass->SetInputTexture(depthTexture);
     m_normalPass->Render();
-    m_compositionPass->SetInputTexture(depthTexture, 0);
-    m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(),     1);
-    m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(),        2);
-    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
-    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
-    m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
+    m_compositionPass->SetInputTexture({ depthTexture, 0 });
+    m_compositionPass->SetInputTexture({ m_thicknessPass->GetBuffer(),     1 });
+    m_compositionPass->SetInputTexture({ m_normalPass->GetBuffer(),        2 });
+    m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(),        3 });
+    m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(1),       4 });
+    m_compositionPass->SetInputTexture({ m_meshesShadowPass->GetBuffer(0), 5 });
     
     // TODO: This needs to be done at the render pass level
     if (m_meshesPass->HasSkybox())

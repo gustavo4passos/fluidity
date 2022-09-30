@@ -15,10 +15,6 @@ namespace fluidity
     void ProcessInput(const SDL_Event& e);
     void Update();
 
-    float GetYaw()   { return m_yaw;   };
-    float GetPitch() { return m_pitch; };
-
-
   private:
     void ProcessMouse();
     // Assures pitches between -89 and 89 degrees
@@ -29,8 +25,6 @@ namespace fluidity
 
     glm::vec2 m_lastMousePosition;
     bool m_mouseClicked;
-    float m_yaw;
-    float m_pitch;
 
     glm::vec3 m_movingOnAxis;
 

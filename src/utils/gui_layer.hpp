@@ -15,6 +15,8 @@ public:
     bool ProcessEvent(const SDL_Event& e);
     void Render();
 
+    void SetSceneSerializer(const SceneSerializer& ss) { m_sceneSerializer = ss; }
+
 private:
     void RenderMainMenuBar();
     void LoadNewScene();

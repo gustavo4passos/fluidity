@@ -9,7 +9,11 @@ Camera::Camera(const glm::vec3& position, float fov, float aspectRatio)
   m_front(glm::normalize(glm::vec3(-35.f, -1.f, 0.f) - position)), // TODO: This shouldn't be hardcoded
   m_fov(fov),
   m_aspectRatio(aspectRatio)
-{ /* */ } 
+{
+    // TODO: These should not be hardcoded
+    m_yaw = 177;
+    m_pitch = -21;
+} 
 
  
 const glm::mat4 Camera::GetProjectionMatrix()

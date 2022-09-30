@@ -35,6 +35,8 @@ out float fragDepth;
 
 // Shadows
 uniform sampler2D uShadowMap;
+uniform samplerCube uSkybox;
+
 uniform int uHasShadows;
 uniform float uMinShadowBias;
 uniform float uMaxShadowBias;
@@ -46,6 +48,7 @@ uniform vec3  uDiffuse;
 uniform vec3  uSpecular;
 uniform float uShininess;
 uniform int   uEmissive;
+uniform float uReflectiveness;
 
 float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 {
@@ -107,8 +110,8 @@ void main()
     vec3 halfwayDir = normalize(viewDir - lightDir);
 
     float specularStrength = 1;
-    vec3 reflectDir = reflect(lightDir, normal);
-    vec3 specular = pow(max(dot(viewDir, reflectDir), 0), uShininess) * uSpecular * lights[0].diffuse.xyz;
+    vec3 specReflectDir = reflect(lightDir, normal);
+    vec3 specular = pow(max(dot(viewDir, specReflectDir), 0), uShininess) * uSpecular * lights[0].diffuse.xyz;
 
     float shadow = 1;
     if (uHasShadows == 1)
@@ -123,9 +126,20 @@ void main()
         }
     }
 
+    vec3 reflectionDir = reflect(-viewDir, normal);
+    vec4 reflectionColor = texture(uSkybox, reflectionDir);
+
     vec3 diffuse = max(dot(normal, -lightDir), 0.0) * lights[0].diffuse.xyz * uDiffuse;
     vec3 ambient = uDiffuse * lights[0].ambient.xyz;
-    fragColor = (diffuse + specular) * shadow + ambient;
+    vec3 nonReflectiveColor = (diffuse + specular);
+
+    const float refractiveIndex = 1.33;
+    const float eta             = 1.0 / refractiveIndex; // Ratio of indices of refraction
+    const float fresnelPower    = 5.0;
+    const float F               = ((1.0 - eta) * (1.0 - eta)) / ((1.0 + eta) * (1.0 + eta));
+    float fresnelRatio    = clamp(F + (1.0 - F) * pow((1.0 - dot(viewDir, normal)), fresnelPower), 0, 1);
+    fresnelRatio = uReflectiveness * fresnelRatio;
+    fragColor = mix(nonReflectiveColor, reflectionColor.xyz, fresnelRatio) * shadow + ambient;;
 
     // If material is emissive, just show it's diffuse color.
     // Otherwise, use the normal lighting calculations

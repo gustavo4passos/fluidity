@@ -7,14 +7,8 @@ namespace fluidity
     : m_camera(camera),
     m_speed(.3f),
     m_movingOnAxis(0.f, 0.f, 0.f),
-    m_yaw(0),
-    m_pitch(0),
     m_mouseClicked(false)
   { 
-    // TODO: These should not be hardcoded
-    m_yaw = 177;
-    m_pitch = -21;
-
     int x, y;
     SDL_GetMouseState(&x, &y);
     m_lastMousePosition = glm::vec2(x, y);
@@ -130,29 +124,32 @@ namespace fluidity
     glm::vec2 mouseMove = m_lastMousePosition - glm::vec2(x, y); 
     m_lastMousePosition = glm::vec2(x, y);
 
-    float sensitivity = .2f; 
-    m_yaw   += mouseMove.x * sensitivity;
-    SetPitch(m_pitch - mouseMove.y * sensitivity);
+    float sensitivity = .2f;
+    float yaw = m_camera.GetYaw();
+    yaw   += mouseMove.x * sensitivity;
+    m_camera.SetYaw(yaw);
+
+    SetPitch(m_camera.GetPitch() - mouseMove.y * sensitivity);
   }
 
   void CameraController::SetPitch(float pitch)
   {
-    m_pitch = pitch;
-    if (m_pitch >  89.f) m_pitch =  89.f;
-    if (m_pitch < -89.f) m_pitch = -89.f;
+    m_camera.SetPitch(pitch);
+    if (pitch >  89.f) m_camera.SetPitch( 89.f);
+    if (pitch < -89.f) m_camera.SetPitch(-89.f);
   }
 
   void CameraController::Update() 
   {
     ProcessMouse();
 
-#if GAME_CONTROLLER_ENABLED
+#if true
     if (m_gameController.IsControllerConnected())
     {
       AxisStatus axisStatus = m_gameController.GetAxisStatus();
 
-      m_yaw += axisStatus.rightAxis.x;
-      SetPitch(m_pitch - axisStatus.rightAxis.y);
+      m_camera.SetYaw(m_camera.GetYaw() + axisStatus.rightAxis.x);
+      SetPitch(m_camera.GetPitch() - axisStatus.rightAxis.y);
 
       m_movingOnAxis.x = axisStatus.leftAxis.x;
       m_movingOnAxis.z = -axisStatus.leftAxis.y;
@@ -163,9 +160,11 @@ namespace fluidity
 #endif
 
     glm::vec3 direction;
-    direction.x = std::cos(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
-    direction.y = std::sin(glm::radians(m_pitch));
-    direction.z = std::sin(glm::radians(m_yaw)) * std::cos(glm::radians(m_pitch));
+    float yaw = m_camera.GetYaw();
+    float pitch = m_camera.GetPitch();
+    direction.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+    direction.y = std::sin(glm::radians(pitch));
+    direction.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
 
     glm::vec3 front = glm::normalize(direction); 
     m_camera.SetFront(glm::normalize(direction));

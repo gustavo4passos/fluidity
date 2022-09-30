@@ -147,7 +147,6 @@ void GuiLayer::RenderParametersWindow()
             int modelIdHash = 0;
             for (auto& model : m_fluidRenderer->m_scene.models)
             {
-                ImGui::Separator();
                 ImGui::Spacing();
                 ImGui::Text(model.GetFilePath().c_str());
                 bool hasSmoothedNormals = model.HasSmoothNormals();
@@ -173,18 +172,22 @@ void GuiLayer::RenderParametersWindow()
                 vec3 translation = model.GetTranslation();
                 ImGui::DragFloat3("Translation", (float*)&translation, 0.05, -4000, 4000);
                 model.SetTranslation(translation);
-                ImGui::Spacing();
 
                 vec3 scale = model.GetScale();
                 float scale1f = scale.x;
                 ImGui::DragFloat("Scale", &scale1f, 0.05, 0.05, 300);
                 model.SetScale({ scale1f, scale1f, scale1f });
 
+                ImGui::Spacing();
                 auto& material = model.GetMaterial();
                 ImGui::ColorEdit3("Diffuse", (float*)&material.diffuse);
                 ImGui::ColorEdit3("Specular", (float*)&material.specular);
                 ImGui::SliderFloat("Shininess", &material.shininess, 0.01, 3000);
+                ImGui::SliderFloat("Reflectiveness", &material.reflectiveness, 0.f, 2.f);
 
+                ImGui::Spacing();
+                ImGui::Spacing();
+                ImGui::Separator();
                 ImGui::PopID();
             }
 
@@ -206,12 +209,14 @@ void GuiLayer::RenderParametersWindow()
             ImGui::DragFloat("FOV", &fov, 0.5, 1, 179);
             camera.SetFOV(fov);
 
-            auto& cameraController = m_fluidRenderer->m_cameraController;
-            float yaw   = cameraController.GetYaw();
-            float pitch = cameraController.GetPitch();
+            float yaw = camera.GetYaw();
+            float pitch = camera.GetPitch();
 
             ImGui::DragFloat("Yaw", (float*)&yaw, 0.5, -100, 100);
             ImGui::DragFloat("Pitch", (float*)&pitch, 0.5, -100, 100);
+
+            camera.SetYaw(yaw);
+            camera.SetPitch(pitch);
         }
     }
     ImGui::End();
@@ -390,7 +395,7 @@ void GuiLayer::RenderMainMenuBar()
 void GuiLayer::LoadNewScene()
 {
     const char* acceptedFileTypes[1] = { "*.yml" };
-    auto exportScenePath = tinyfd_openFileDialog("Export Scene", nullptr, 1, acceptedFileTypes, "Scene files", 0);
+    auto exportScenePath = tinyfd_openFileDialog("Load Scene", nullptr, 1, acceptedFileTypes, "Scene files", 0);
     if (exportScenePath != nullptr)
     {
         m_sceneSerializer = SceneSerializer(exportScenePath);
@@ -458,6 +463,7 @@ void GuiLayer::SaveScene()
     if (m_sceneSerializer.GetFilePath().empty()) SaveSceneAs();
     else
     {
+        m_fluidRenderer->m_scene.camera = m_fluidRenderer->m_cameraController.GetCamera();
         m_sceneSerializer.SetScene(m_fluidRenderer->m_scene);
         m_sceneSerializer.Serialize();
     }
@@ -468,7 +474,8 @@ void GuiLayer::SaveSceneAs()
     auto sceneFileName = GetNewSceneFilenameDialog();
     if (!sceneFileName.empty()) 
     {
-        std::cout << "rsrrs" << std::endl;
+        // TODO: Scene camera should not be separated from 
+        // the camera controller
         Scene sc = m_fluidRenderer->m_scene;
         sc.camera = m_fluidRenderer->m_cameraController.GetCamera();
         m_sceneSerializer = SceneSerializer(sc, sceneFileName);
@@ -478,7 +485,7 @@ void GuiLayer::SaveSceneAs()
 
 void GuiLayer::LoadModel()
 {
-    auto modelPath = tinyfd_openFileDialog("Export Scene", nullptr, 0, nullptr, "Model Files", 0);
+    auto modelPath = tinyfd_openFileDialog("Load model", nullptr, 0, nullptr, "Model Files", 0);
     if (modelPath != nullptr)
     {
         Model m = Model(modelPath);

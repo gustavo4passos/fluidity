@@ -85,6 +85,20 @@ struct YAML::convert<vec3>
     }
 };
 
+template<>
+struct YAML::convert<glm::vec3>
+{
+    static bool decode(const YAML::Node& node, glm::vec3& v)
+    {
+        if (!node.IsSequence() || node.size() != 3) return false;
+
+        v.x = node[0].as<float>();
+        v.y = node[1].as<float>();
+        v.z = node[2].as<float>();
+        return true;
+    }
+};
+
 
 template<>
 struct YAML::convert<PointLight>
@@ -128,6 +142,10 @@ struct YAML::convert<Material>
         m.specular  = node["specular"].as<vec3>();
         m.shininess = node["shininess"].as<float>();
         m.emissive  = node["emissive"].as<bool>();
+
+        if (node["reflectiveness"]) m.reflectiveness = node["reflectiveness"].as<float>();
+        else m.reflectiveness = 0;
+        
         return true;
     }
 };
@@ -142,6 +160,11 @@ struct YAML::convert<fluidity::Camera>
         auto position = node["position"].as<vec3>();
         c.SetPosition({ position.x, position.y, position.z });
         c.SetFOV(node["fov"].as<float>());
+
+        if (node["yaw"]) c.SetYaw(node["yaw"].as<float>());
+        if (node["pitch"]) c.SetPitch(node["pitch"].as<float>());
+        if (node["front"]) c.SetFront(node["front"].as<glm::vec3>());
+
         return true;
     }
 };
@@ -179,6 +202,15 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Vec4& vec)
 }
 
 YAML::Emitter& operator << (YAML::Emitter& out, const vec3& vec)
+{
+    out << YAML::Flow;
+    out << YAML::BeginSeq << vec.x << vec.y << vec.z;
+    out << YAML::EndSeq;
+
+    return out;
+}
+
+YAML::Emitter& operator << (YAML::Emitter& out, const glm::vec3& vec)
 {
     out << YAML::Flow;
     out << YAML::BeginSeq << vec.x << vec.y << vec.z;
@@ -226,11 +258,12 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
 {
     using namespace YAML;
     out << BeginMap;
-        out << Key << "ambient"   << material.ambient;
-        out << Key << "diffuse"   << material.diffuse;
-        out << Key << "specular"  << material.specular;
-        out << Key << "shininess" << material.shininess;
-        out << Key << "emissive"  << material.emissive;
+        out << Key << "ambient"        << material.ambient;
+        out << Key << "diffuse"        << material.diffuse;
+        out << Key << "specular"       << material.specular;
+        out << Key << "shininess"      << material.shininess;
+        out << Key << "emissive"       << material.emissive;
+        out << Key << "reflectiveness" << material.reflectiveness;
     out << EndMap;
     return out;
 }
@@ -242,6 +275,9 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     out << BeginMap;
         out << Key << "position" << Flow << BeginSeq << position.x << position.y << position.z << EndSeq;
         out << Key << "fov" << Value << camera.GetFOV();
+        out << Key << "yaw" << Value <<  camera.GetYaw();
+        out << Key << "pitch" << Value << camera.GetPitch();
+        out << Key << "front" << Value << camera.GetFront();
     out << EndMap;
 
     return out;

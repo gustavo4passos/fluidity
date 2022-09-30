@@ -65,7 +65,8 @@ file(GLOB SOURCES ./src/utils/*.cpp ./src/*.cpp ./src/renderer/*.cpp ./src/input
 
 # Assets
 if (WIN32)
-add_executable(fluidity ${IMGUI_SOURCES} ${SOURCES} ${TINYFILEDIALOGS_SOURCES})
+    set(APP_ICON_RESOURCE_WINDOWS ${CMAKE_CURRENT_SOURCE_DIR}/assets/appicon.rc)
+    add_executable(fluidity ${IMGUI_SOURCES} ${SOURCES} ${TINYFILEDIALOGS_SOURCES} ${APP_ICON_RESOURCE_WINDOWS})
     add_custom_target(copy-shaders COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders)
     add_custom_target(copy-assets COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/assets ${CMAKE_BINARY_DIR}/assets)
 
