@@ -24,15 +24,12 @@ ParticlePass::ParticlePass(
   // Maximum possible distance
   constexpr float minusInfinity = -std::numeric_limits<float>::infinity();
   m_renderState.clearColor = { minusInfinity, minusInfinity, minusInfinity, 1.0 };
+  m_framebuffer.PushAttachment(m_renderTargetSpecification);
 }
 
 bool ParticlePass::Init()
 {
   m_shader = new Shader(m_vsFilePath, m_fsFilePath);
-  m_framebuffer.PushAttachment({ m_renderTargetSpecification.internalFormat, 
-      m_renderTargetSpecification.pixelFormat, m_renderTargetSpecification.dataType
-  });
-
   if (!RenderPass::Init()) return false;
 
   return true;
@@ -41,18 +38,21 @@ bool ParticlePass::Init()
 void ParticlePass::Render()
 {
   assert(m_shader != nullptr);
+  int viewportState[4];
+  glGetIntegerv(GL_VIEWPORT, viewportState);
 
   // Save OpenGL state before changing it
   RenderState previousRenderState = GetCurrentOpenGLRenderState();
-
-  ChangeOpenGLRenderState(m_renderState);
-
   m_framebuffer.Bind();
+  ChangeOpenGLRenderState(m_renderState);
+  glViewport(0, 0, m_bufferWidth, m_bufferHeight);
+
+  GLCall(glClear(GL_COLOR_BUFFER_BIT));
+  if (m_renderState.useDepthTest) GLCall(glClear(GL_DEPTH_BUFFER_BIT));
+
   m_shader->Bind();
 
   GLCall(glBindVertexArray(m_vao));
-  GLCall(glClear(GL_COLOR_BUFFER_BIT));
-  if (m_renderState.useDepthTest) GLCall(glClear(GL_DEPTH_BUFFER_BIT));
   GLCall(glDrawArrays(GL_POINTS, 0, m_numVertices));
 
   GLCall(glBindVertexArray(0));
@@ -60,6 +60,7 @@ void ParticlePass::Render()
   m_framebuffer.Unbind();
 
   // Restore previous render state
+  glViewport(viewportState[0], viewportState[1], viewportState[2], viewportState[3]);
   ChangeOpenGLRenderState(previousRenderState);
 }
 

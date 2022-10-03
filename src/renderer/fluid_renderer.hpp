@@ -49,6 +49,8 @@ private:
   void UploadMaterial(); 
   void SetUpStaticUniforms();
   void SetUpPerFrameUniforms();
+  void RenderMeshes();
+  void DoFiltering();
 
   void SetVAOS();
   void SetNumberOfParticles();
@@ -59,6 +61,8 @@ private:
   ParticleRenderPass* m_particleRenderPass;
   ParticlePass*       m_depthPass;
   ParticlePass*       m_thicknessPass;
+  ParticlePass*       m_fluidShadowPass;
+  ParticlePass*       m_thicknessShadowPass;
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;

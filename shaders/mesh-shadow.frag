@@ -5,5 +5,5 @@ out float fragColor;
 
 void main()
 {
-    fragColor = fFragPos.z / fFragPos.w;
+    fragColor = (fFragPos.z / fFragPos.w) * 0.5 + 0.5;
 }

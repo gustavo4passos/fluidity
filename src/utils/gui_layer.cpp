@@ -82,13 +82,16 @@ void GuiLayer::RenderParametersWindow()
             ImGui::Spacing();
 
             ImGui::Text("Shadows");
-            ImGui::Checkbox("Render shadows", &lightingParameters.renderShadows);
+            ImGui::Checkbox("Object Shadows", &lightingParameters.renderShadows);
+            ImGui::SameLine();
+            ImGui::Checkbox("Fluid shadows", &lightingParameters.renderFluidShadows);
             ImGui::SameLine();
             ImGui::Checkbox("PCF", &lightingParameters.usePcf);
             ImGui::Spacing();
             ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias,   0.00001f, 0.f, 1.f);
             ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias,   0.00001f, 0.f, 1.f);
-            ImGui::DragFloat("Shadow Intensity", &lightingParameters.shadowIntensity, 0.005f, 0.f, 1.f);
+            ImGui::DragFloat("Object Shadow Intensity", &lightingParameters.shadowIntensity, 0.005f, 0.f, 1.f);
+            ImGui::DragFloat("Fluid Shadow Intensity", &lightingParameters.fluidShadowIntensity, 0.0005f, 0.f, 1.f);
 
             ImGui::Spacing();
             ImGui::Spacing();
@@ -116,6 +119,7 @@ void GuiLayer::RenderParametersWindow()
             ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
             ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
             ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
+            ImGui::Checkbox("1D Filter", &filteringParameters.filter1D);
 
             ImGui::Separator();
             ImGui::Checkbox("Gamma Correction", &filteringParameters.gammaCorrection);

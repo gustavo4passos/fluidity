@@ -63,7 +63,7 @@ int main(int argc, char* args[])
     const unsigned int WINDOW_WIDTH = 1366;
     const unsigned int WINDOW_HEIGHT = 768;
 
-    Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false)  ;
+    Window window = Window("Fluidity", WINDOW_WIDTH, WINDOW_HEIGHT, 4, 5, true, false);
 
     if(!window.Init()) 
     {

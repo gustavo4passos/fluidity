@@ -18,19 +18,22 @@
 //                                 (((__) (__)))
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// fragment shader, depth map shading
+// fragment shader, fluid shadow
 #version 410 core
+#define NUM_TOTAL_LIGHTS 8
 
-layout(std140) uniform CameraData
+struct LightMatrix
 {
     mat4 viewMatrix;
-    mat4 projectionMatrix;
-    mat4 invViewMatrix;
-    mat4 invProjectionMatrix;
-    mat4 shadowMatrix;
-    vec4 camPosition;
+    mat4 prjMatrix;
 };
 
+layout(std140) uniform LightMatrices
+{
+    LightMatrix lightMatrices[NUM_TOTAL_LIGHTS];
+};
+
+uniform int   u_LightID;
 uniform float u_PointRadius;
 uniform int   u_UseAnisotropyKernel;
 uniform int   u_ScreenWidth;
@@ -38,8 +41,11 @@ uniform int   u_ScreenHeight;
 
 in vec3      f_ViewCenter;
 flat in mat3 f_AnisotropyMatrix;
+flat in mat4 invPrjMatrix;
+out float    outDepth;
 
-out float outDepth;
+uniform float uNear;
+uniform float uFar;
 
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 void main()
@@ -63,10 +69,10 @@ void main()
         fc    *= 2.0;
         fc    -= 1.0;
 
-        vec4 worldPos = invProjectionMatrix * vec4(fc, 1.0);
+        vec4 worldPos = invPrjMatrix * vec4(fc, 1.0);
         vec3 rayDir   = vec3(worldPos) / worldPos.w;
 
-        mat3 transMatrix    = mat3(viewMatrix) * f_AnisotropyMatrix * u_PointRadius;
+        mat3 transMatrix    = mat3(lightMatrices[u_LightID].viewMatrix) * f_AnisotropyMatrix * u_PointRadius;
         mat3 transInvMatrix = inverse(transMatrix);
         mat3 normalMatrix   = transpose(inverse((transMatrix)));
 
@@ -86,8 +92,8 @@ void main()
     }
 
     //calculate depth
-    vec4 clipSpacePos = projectionMatrix * vec4(fragPos, 1.0);
-    outDepth = fragPos.z;
+    vec4 clipSpacePos = lightMatrices[u_LightID].prjMatrix * vec4(fragPos, 1.0);
+    outDepth = (clipSpacePos.z / clipSpacePos.w) * 0.5 + 0.5;
 
     gl_FragDepth = (clipSpacePos.z / clipSpacePos.w) * 0.5 + 0.5;
 }

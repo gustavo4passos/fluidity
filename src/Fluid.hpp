@@ -26,16 +26,13 @@ public:
 
     const std::vector<std::string>& GetFileList() const { return m_npzFileList; }
 
-    template<typename T>
-    T* GetFramePosData(int frame);
-
     GLuint GetFrameVao(int frame);
 
 private:
     int CalcNumberOfParticles(const cnpy::NpyArray& particleData);
     cnpy::NpyArray& GetFramePosArray(cnpy::npz_t& particleData);
     bool LoadFrameToVao(int frame);
-    std::tuple<GLuint, GLuint> Fluid::LoadParticleDataToVao(const cnpy::NpyArray& data);
+    std::tuple<GLuint, GLuint> LoadParticleDataToVao(const cnpy::NpyArray& data);
 
     GLenum GetDataTypeFromWordSize(size_t wordSize);
 
@@ -43,9 +40,3 @@ private:
     std::vector<std::string> m_npzFileList;
     std::vector<FrameData> m_frameData;
 };
-
-template<typename T>
-T* Fluid::GetFramePosData(int frame)
-{
-    return GetFramePosArray(frame).data<T>();
-}

@@ -165,10 +165,10 @@ void main()
         //        float dy            = 1.0f / 1920.0f;
         float dx            = 1.0f / 1620.0f;
         float dy            = 1.0f / 2880.0f;
-        float solidDepth_nx = texture(u_SolidDepthMap, f_TexCoord + vec2(-dx, 0)).r;
-        float solidDepth_px = texture(u_SolidDepthMap, f_TexCoord + vec2(dx, 0)).r;
-        float solidDepth_ny = texture(u_SolidDepthMap, f_TexCoord + vec2(0, -dy)).r;
-        float solidDepth_py = texture(u_SolidDepthMap, f_TexCoord + vec2(0, dy)).r;
+        float solidDepth_nx = texture(u_SolidDepthMap, f_TexCoord + vec2(-dx,  0)).r;
+        float solidDepth_px = texture(u_SolidDepthMap, f_TexCoord + vec2( dx,  0)).r;
+        float solidDepth_ny = texture(u_SolidDepthMap, f_TexCoord + vec2(  0, -dy)).r;
+        float solidDepth_py = texture(u_SolidDepthMap, f_TexCoord + vec2(  0,  dy)).r;
 #endif
         float solidDepth = texture(u_SolidDepthMap, f_TexCoord).r;
         if(eyeDepth < solidDepth + DEPTH_BIAS
@@ -179,8 +179,8 @@ void main()
            && eyeDepth < solidDepth_py + DEPTH_BIAS
 #endif
            ) {
-            fragColor = vec4(backColor, 1.0f);
-            return;
+                fragColor = vec4(backColor, 1.0f);
+                return;
         }
     }
 
@@ -202,6 +202,7 @@ void main()
     }
 
     vec3 shadowColor = vec3(1.0);
+#if ENABLE_COMPOSITION_SHADOWS
     if(u_HasShadow == 1) {
         vec4  worldCoord        = uvToSpace(f_TexCoord, eyeDepth);
         vec4  lightCoord        = lightMatrices[lightID].viewMatrix * worldCoord;
@@ -235,6 +236,7 @@ void main()
             shadowColor *= vec3(0.1, 0.1, 1.0);
         }
     }
+#endif
 
     if(u_TransparentFluid == 0) {
         fragColor = vec4(vec3(material.ambient + material.diffuse * diffuse + vec4(0, 0, 0.2, 0) + material.specular * specular) * shadowColor, 1.0);

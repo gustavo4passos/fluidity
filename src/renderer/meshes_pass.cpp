@@ -49,7 +49,6 @@ void MeshesPass::Render()
     float minusInfinity = -1000000.f;
     GLCall(glClearBufferfv(GL_COLOR, 1, &minusInfinity));
 
-
     m_shader->Bind();
     BindTextures();
 
