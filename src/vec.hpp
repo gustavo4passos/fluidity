@@ -67,6 +67,7 @@ struct Material {
   vec3 specular;
   float shininess;
   bool emissive;
+  float reflectiveness;
 };
 
 #pragma pack(pop)

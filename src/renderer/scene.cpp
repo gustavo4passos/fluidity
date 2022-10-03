@@ -10,13 +10,15 @@ struct YAML::convert<fluidity::FilteringParameters>
 {
     static bool decode(const YAML::Node& node, fluidity::FilteringParameters& fp)
     {
-        if (!node.IsSequence() || node.size() != 5) return false;
+        if (!node.IsSequence() || node.size() < 5) return false;
 
         fp.nIterations       = node[0].as<int>();
         fp.filterSize        = node[1].as<int>();
         fp.maxFilterSize     = node[2].as<int>();
         fp.gammaCorrection   = node[3].as<bool>();
         fp.useRefractionMask = node[4].as<bool>();
+        if (node.size() > 5) fp.filter1D = node[5].as<bool>();
+
         return true;
     }
 };
@@ -52,6 +54,16 @@ struct YAML::convert<fluidity::LightingParameters>
         {
             lp.showLightsOnScene = node[5].as<bool>();
         }
+
+        if (node.size() > 6) 
+        {
+            lp.renderFluidShadows = node[6].as<bool>();
+        }
+
+        if (node.size() > 7)
+        {
+            lp.fluidShadowIntensity = node[7].as<float>();
+        }
         return true;
     }
 };
@@ -75,6 +87,20 @@ template<>
 struct YAML::convert<vec3>
 {
     static bool decode(const YAML::Node& node, vec3& v)
+    {
+        if (!node.IsSequence() || node.size() != 3) return false;
+
+        v.x = node[0].as<float>();
+        v.y = node[1].as<float>();
+        v.z = node[2].as<float>();
+        return true;
+    }
+};
+
+template<>
+struct YAML::convert<glm::vec3>
+{
+    static bool decode(const YAML::Node& node, glm::vec3& v)
     {
         if (!node.IsSequence() || node.size() != 3) return false;
 
@@ -128,6 +154,10 @@ struct YAML::convert<Material>
         m.specular  = node["specular"].as<vec3>();
         m.shininess = node["shininess"].as<float>();
         m.emissive  = node["emissive"].as<bool>();
+
+        if (node["reflectiveness"]) m.reflectiveness = node["reflectiveness"].as<float>();
+        else m.reflectiveness = 0;
+        
         return true;
     }
 };
@@ -142,6 +172,11 @@ struct YAML::convert<fluidity::Camera>
         auto position = node["position"].as<vec3>();
         c.SetPosition({ position.x, position.y, position.z });
         c.SetFOV(node["fov"].as<float>());
+
+        if (node["yaw"]) c.SetYaw(node["yaw"].as<float>());
+        if (node["pitch"]) c.SetPitch(node["pitch"].as<float>());
+        if (node["front"]) c.SetFront(node["front"].as<glm::vec3>());
+
         return true;
     }
 };
@@ -153,7 +188,7 @@ YAML::Emitter& operator << (YAML::Emitter& out, const FilteringParameters& filte
     const FilteringParameters& fp = filteringParameters;
     out << YAML::Flow;
     out << YAML::BeginSeq << fp.nIterations << fp.filterSize << fp.maxFilterSize << 
-        fp.gammaCorrection << fp.useRefractionMask;
+        fp.gammaCorrection << fp.useRefractionMask << fp.filter1D;
     out << YAML::EndSeq;
 
     return out;
@@ -187,12 +222,22 @@ YAML::Emitter& operator << (YAML::Emitter& out, const vec3& vec)
     return out;
 }
 
+YAML::Emitter& operator << (YAML::Emitter& out, const glm::vec3& vec)
+{
+    out << YAML::Flow;
+    out << YAML::BeginSeq << vec.x << vec.y << vec.z;
+    out << YAML::EndSeq;
+
+    return out;
+}
+
 YAML::Emitter& operator << (YAML::Emitter& out, const LightingParameters& lightingParameters)
 {
     const LightingParameters& lp = lightingParameters; 
     out << YAML::Flow;
     out << YAML::BeginSeq << lp.minShadowBias << lp.maxShadowBias << lp.shadowIntensity 
-        << lp.usePcf << lp.renderShadows << lp.showLightsOnScene;
+        << lp.usePcf << lp.renderShadows << lp.showLightsOnScene << lp.renderFluidShadows
+        << lp.fluidShadowIntensity;
     out << YAML::EndSeq;
 
     return out;
@@ -226,11 +271,12 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Material& material)
 {
     using namespace YAML;
     out << BeginMap;
-        out << Key << "ambient"   << material.ambient;
-        out << Key << "diffuse"   << material.diffuse;
-        out << Key << "specular"  << material.specular;
-        out << Key << "shininess" << material.shininess;
-        out << Key << "emissive"  << material.emissive;
+        out << Key << "ambient"        << material.ambient;
+        out << Key << "diffuse"        << material.diffuse;
+        out << Key << "specular"       << material.specular;
+        out << Key << "shininess"      << material.shininess;
+        out << Key << "emissive"       << material.emissive;
+        out << Key << "reflectiveness" << material.reflectiveness;
     out << EndMap;
     return out;
 }
@@ -242,6 +288,9 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     out << BeginMap;
         out << Key << "position" << Flow << BeginSeq << position.x << position.y << position.z << EndSeq;
         out << Key << "fov" << Value << camera.GetFOV();
+        out << Key << "yaw" << Value <<  camera.GetYaw();
+        out << Key << "pitch" << Value << camera.GetPitch();
+        out << Key << "front" << Value << camera.GetFront();
     out << EndMap;
 
     return out;
@@ -307,7 +356,7 @@ bool SceneSerializer::Deserialize()
 
     YAML::Node root = YAML::Load(contentStream.str());
 
-    Scene sc;
+    Scene sc = Scene::CreateEmptyScene();
     if (root["FilteringParameters"])
     {
         sc.filteringParameters = root["FilteringParameters"].as<FilteringParameters>();
@@ -395,6 +444,7 @@ void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
         out << Key << "hideFrontFaces"   << Value << m.GetHideFrontFaces();
         out << Key << "translation"      << Value << m.GetTranslation();
         out << Key << "scale"            << Value << m.GetScale();
+        out << Key << "visible"          << Value << m.IsVisible();
     out << EndMap;
 }
 
@@ -469,6 +519,12 @@ bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
     {
         auto scale = node["scale"].as<vec3>();
         m.SetScale(scale);
+    }
+
+    if (node["visible"])
+    {
+        auto visible = node["visible"].as<bool>();
+        m.SetIsVisible(visible);
     }
 
     return true;

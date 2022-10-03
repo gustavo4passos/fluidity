@@ -18,6 +18,37 @@ struct RenderState
   GLenum cullFaceMode           = GL_BACK;
 };
 
+enum class TextureType
+{
+  Texture2D,
+  Cubemap
+};
+
+struct TextureBind
+{
+  GLuint id = 0;
+  int slot = 0;
+  TextureType type = TextureType::Texture2D;
+  
+  TextureBind() = default;
+  TextureBind(GLuint id)
+    : id(id),
+    slot(0),
+    type(TextureType::Texture2D)
+  { /* */ }
+
+  TextureBind(GLuint id, int slot)
+    : id(id),
+    slot(slot)
+  { /* */ }
+
+  TextureBind(GLuint id, int slot, TextureType type)
+    : id(id),
+    slot(slot),
+    type(type)
+  { /* */ }
+};
+
 class RenderPass
 {
 public:
@@ -43,7 +74,7 @@ public:
   virtual void SetRenderState(const RenderState& state) { m_renderState = state; };
   virtual RenderState& GetRenderState() { return m_renderState; } 
 
-  virtual void SetInputTexture(GLuint texture, int slot = 0);
+  virtual void SetInputTexture(const TextureBind& textureBind);
   void BindTextures();
   void UnbindTextures();
 
@@ -63,7 +94,7 @@ protected:
   Framebuffer m_framebuffer;
   RenderState m_renderState;
 
-  std::unordered_map<int, GLuint> m_textureBinds;
+  std::unordered_map<int, TextureBind> m_textureBinds;
 
 };
 

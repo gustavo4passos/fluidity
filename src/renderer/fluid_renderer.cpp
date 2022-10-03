@@ -113,6 +113,26 @@ auto FluidRenderer::Init() -> bool
     &m_scene
   );
 
+  m_fluidShadowPass = new ParticlePass(
+    2048,
+    2048,
+    0,
+    currentVao,
+    { GL_R32F, GL_RED, GL_FLOAT },
+    "../../shaders/fluid-shadow.vs",
+    "../../shaders/fluid-shadow.fs"
+  );
+
+  m_thicknessShadowPass = new ParticlePass(
+    m_windowWidth,
+    m_windowHeight,
+    0,
+    currentVao,
+    { GL_R32F, GL_RED, GL_FLOAT },
+    "../../shaders/thickness-shadow.vert",
+    "../../shaders/thickness-shadow.frag"
+  );
+
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
   m_renderPasses["FilterPass"]         = m_filterPass;
@@ -121,6 +141,8 @@ auto FluidRenderer::Init() -> bool
   m_renderPasses["ThicknessPass"]      = m_thicknessPass;
   m_renderPasses["MeshesPass"]         = m_meshesPass;
   m_renderPasses["MeshesShadowPass"]   = m_meshesShadowPass;
+  m_renderPasses["FluidShadowPass"]    = m_fluidShadowPass;
+  m_renderPasses["ThicknessShadow"]    = m_thicknessShadowPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -147,13 +169,33 @@ auto FluidRenderer::Init() -> bool
     renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 1.f };
     m_thicknessPass->SetRenderState(renderState);
   }
+
+  // Thickness shadow pass -> Setup
+  {
+    auto renderState = m_thicknessShadowPass->GetRenderState();
+    renderState.useBlend                = true;
+    renderState.useDepthTest            = false;
+    renderState.blendSourceFactor       = GL_ONE;
+    renderState.blendDestinationFactor  = GL_ONE;
+    renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 1.f };
+    m_thicknessShadowPass->SetRenderState(renderState);
+  }
+  
   // Meshes pass -> Setup
   {
     auto& meshesRenderState = m_meshesPass->GetRenderState();
     meshesRenderState.clearColor = { 206.f / 255.f, 96.f / 255.f, 44.f / 255.f, 1.f };
     auto& meshesShadowRenderState = m_meshesShadowPass->GetRenderState();
-    meshesShadowRenderState.clearColor = { -1.f, -1.f, -1.f, 1.f };
+    meshesShadowRenderState.clearColor = { 1.f, 1.f, 1.f, 1.f };
   }
+
+  // Fluid shadow pass -> Setup
+  {
+    auto& m_fluidShadowRenderState = m_fluidShadowPass->GetRenderState();
+    m_fluidShadowRenderState.useDepthTest = true;
+    m_fluidShadowRenderState.clearColor = { 1.f, 1.f, 1.f, 1.f };
+  }
+
 
   // Load light model - Represents the light in the scene
   m_lightModel.Load();
@@ -341,7 +383,18 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     depthPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
     depthPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     depthPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
-    depthPassShader.Unbind(); 
+    depthPassShader.Unbind();
+  }
+
+  // Meshes pass -> Init uniforms
+  {
+    auto& meshesPassSahder = m_meshesPass->GetShader();
+    meshesPassSahder.Bind();
+    meshesPassSahder.SetUniform1i("uShadowMap", 0);
+    meshesPassSahder.SetUniform1i("uSkybox", 1);
+    meshesPassSahder.SetUniform1i("uFluidShadowMap", 2);
+    meshesPassSahder.SetUniform1i("uFluidShadowThicknessMap", 3);
+    meshesPassSahder.Unbind(); 
   }
 
   // Thickness pass -> Init uniforms, set up render state
@@ -355,12 +408,22 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     thicknessPassShader.SetUniform1i("u_HasSolid", 0);
     thicknessPassShader.Unbind();
   }
+
+  // Thickness shadow -> Init uniforms, set up render state
+  {
+
+    auto& thicknessShadowPassShader = m_thicknessShadowPass->GetShader();
+    thicknessShadowPassShader.Bind();
+    thicknessShadowPassShader.SetUniform1f("u_PointScale", 
+      (float)m_windowHeight / tanf(55.0 * 0.5 * 3.14159265358979323846f / 180.0));
+    thicknessShadowPassShader.SetUniform1i("u_LightID", 0);
+    thicknessShadowPassShader.Unbind();
+  }
   
   // Narrow filter pass -> Init uniforms
   {
     auto& narrowFilterShader = m_filterPass->GetShader();
     narrowFilterShader.Bind();
-    narrowFilterShader.SetUniform1i("u_DoFilter1D", 0);
     narrowFilterShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     narrowFilterShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     narrowFilterShader.SetUniform1i("u_FilterSize", filteringParameters.filterSize);
@@ -392,7 +455,17 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     compositionPassShader.SetUniform1i("u_SkyBoxTex",           6);
     compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
     compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
+    compositionPassShader.SetUniform1i("u_FluidShadowMaps[0]", 7);
+    compositionPassShader.SetUniform1i("u_FluidShadowThickness[0]", 8);
     compositionPassShader.Unbind();
+  }
+
+  // Fluid shadow pass -> Init uniforms 
+  {
+    auto& fluidShadowShader = m_fluidShadowPass->GetShader();
+    fluidShadowShader.Bind();
+    fluidShadowShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
+    fluidShadowShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
   }
 }
 
@@ -407,11 +480,13 @@ void FluidRenderer::SetUpPerFrameUniforms()
   UploadMaterial();
 
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferLightMatrices));
+  float zNear = 1.0;
+  float zFar  = 100.f;
   for (int i = 0; i < m_scene.lights.size(); i++)
   {
     auto& l = m_scene.lights[i];
     float radius = 10.f;
-    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, 1.f, 100.f);
+    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, zNear, zFar);
     // Find light matrix
     glm::mat4 lightView = glm::lookAt(glm::vec3(l.position.x, l.position.y, l.position.z),
       glm::vec3(0), // directional light, pointing at scene origin
@@ -424,10 +499,12 @@ void FluidRenderer::SetUpPerFrameUniforms()
 
   auto& meshesShader = m_meshesPass->GetShader();
   meshesShader.Bind();
-  meshesShader.SetUniform1i("uHasShadows", lightingParameters.renderShadows ? 1 : 0);
+  meshesShader.SetUniform1i("uRenderShadows", lightingParameters.renderShadows ? 1 : 0);
+  meshesShader.SetUniform1i("uRenderFluidShadows", lightingParameters.renderFluidShadows ? 1 : 0);
   meshesShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
   meshesShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
   meshesShader.SetUniform1f("uShadowIntensity", lightingParameters.shadowIntensity);
+  meshesShader.SetUniform1f("uFluidShadowIntensity", lightingParameters.fluidShadowIntensity);
   meshesShader.SetUniform1i("uUsePcf", lightingParameters.usePcf ? 1 : 0);
   meshesShader.Unbind();
 
@@ -436,17 +513,21 @@ void FluidRenderer::SetUpPerFrameUniforms()
   compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
   // Detail: Shadows require at least one mesh for now
   // TODO: This will change when fluid shadows are added
+#ifdef ENABLE_COMPOSITION_SHADOWS
   compositionPassShader.SetUniform1i("u_HasShadow", lightingParameters.renderShadows && m_scene.models.size() > 0 ? 1 : 0);
   compositionPassShader.SetUniform1f("u_ShadowIntensity", lightingParameters.shadowIntensity);
-  compositionPassShader.SetUniform1f("u_AttennuationConstant", fluidParameters.attenuation);
   compositionPassShader.SetUniform1f("uMinShadowBias", lightingParameters.minShadowBias);
   compositionPassShader.SetUniform1f("uMaxShadowBias", lightingParameters.maxShadowBias);
+#endif
+
+  compositionPassShader.SetUniform1f("u_AttennuationConstant", fluidParameters.attenuation);
   compositionPassShader.SetUniform1f("uRefractionModifier", fluidParameters.refractionModifier);
   compositionPassShader.SetUniform1i("uUseRefractionMask", filteringParameters.useRefractionMask ? 1 : 0);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
   narrowFilterShader.Bind();
+  narrowFilterShader.SetUniform1i("u_DoFilter1D", m_scene.filteringParameters.filter1D ? 1 : 0);
   narrowFilterShader.SetUniform1i("u_FilterSize", filteringParameters.filterSize);
   narrowFilterShader.SetUniform1i("u_MaxFilterSize", filteringParameters.maxFilterSize);
   narrowFilterShader.SetUniform1f("u_ParticleRadius", fluidParameters.pointRadius);
@@ -456,9 +537,18 @@ void FluidRenderer::SetUpPerFrameUniforms()
   thicknessPassShader.Bind();
   thicknessPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius * 1.2f);
 
+  auto& thicknessShadowPassShader = m_thicknessShadowPass->GetShader();
+  thicknessShadowPassShader.Bind();
+  thicknessShadowPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius * 1.2f);
+
   auto& depthPassShader = m_depthPass->GetShader();
   depthPassShader.Bind();
   depthPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
+
+  auto& fluidShadowShader = m_fluidShadowPass->GetShader();
+  fluidShadowShader.Bind();
+  fluidShadowShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
+  fluidShadowShader.SetUniform1i("u_LightID", 0);
 
   m_textureRenderer->SetGammaCorrectionEnabled(filteringParameters.gammaCorrection);
 }
@@ -472,60 +562,35 @@ auto FluidRenderer::Update() -> void
 
 auto FluidRenderer::Render() -> void
 {
-  SetUpPerFrameUniforms();
-  
-  if (m_scene.lightingParameters.renderShadows)
-  {
-    m_meshesShadowPass->Render();
-    m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
-  }
-  
-  // Places light model in the scene
-  if (m_scene.lightingParameters.showLightsOnScene)
-  {
-    // Positions light model in the same position as the light, and set color accordingly
-    auto lightPos = m_scene.lights[0].position;
-    auto lightColor = m_scene.lights[0].diffuse;
-    m_lightModel.SetTranslation({ lightPos.x, lightPos.y, lightPos.z });
-    m_lightModel.GetMaterial().diffuse = { lightColor.x, lightColor.y, lightColor.z };
-    m_scene.models.push_back(m_lightModel);
-  }
-
-  // Set background clear color (comes from meshes rendering, for now)
-  m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
-  m_meshesPass->Render();
-
-  // Remove light model from scene so it does not affect other passes
-  if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
-
+  SetUpPerFrameUniforms(); 
   GLuint depthTexture = 0;
   if (m_scene.fluid.GetNumberOfFrames() > 0)
   {
     SetVAOS();
     SetNumberOfParticles();
 
-    // m_particleRenderPass->Render();
     m_depthPass->Render();
     m_thicknessPass->Render();
 
-    for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
-    {
-      if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
-      else m_filterPass->SwapBuffers();
-      m_filterPass->Render();
-    }
-
+    m_fluidShadowPass->Render();
+    m_thicknessShadowPass->Render();
+  
+    RenderMeshes();
+    DoFiltering();
+    
     depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
       m_depthPass->GetBuffer();
 
     m_normalPass->SetInputTexture(depthTexture);
     m_normalPass->Render();
-    m_compositionPass->SetInputTexture(depthTexture, 0);
-    m_compositionPass->SetInputTexture(m_thicknessPass->GetBuffer(),     1);
-    m_compositionPass->SetInputTexture(m_normalPass->GetBuffer(),        2);
-    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(),        3);
-    m_compositionPass->SetInputTexture(m_meshesPass->GetBuffer(1),       4);
-    m_compositionPass->SetInputTexture(m_meshesShadowPass->GetBuffer(0), 5);
+    m_compositionPass->SetInputTexture({ depthTexture,                        0 });
+    m_compositionPass->SetInputTexture({ m_thicknessPass->GetBuffer(),        1 });
+    m_compositionPass->SetInputTexture({ m_normalPass->GetBuffer(),           2 });
+    m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(),           3 });
+    m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(1),          4 });
+    m_compositionPass->SetInputTexture({ m_meshesShadowPass->GetBuffer(0),    5 });
+    m_compositionPass->SetInputTexture({ m_filterPass->GetBuffer(0),          7 });
+    m_compositionPass->SetInputTexture({ m_thicknessShadowPass->GetBuffer(0), 8 });
     
     // TODO: This needs to be done at the render pass level
     if (m_meshesPass->HasSkybox())
@@ -541,6 +606,14 @@ auto FluidRenderer::Render() -> void
   }
   else
   {
+    // Since there is no fluid, force disable fluid shadows
+    if (m_scene.lightingParameters.renderFluidShadows)
+    {
+      auto& meshesPassShader = m_meshesPass->GetShader();
+      meshesPassShader.Bind();
+      meshesPassShader.SetUniform1i("uRenderFluidShadows", 0);
+      RenderMeshes();
+    }
     m_textureRenderer->SetTexture(m_meshesPass->GetBuffer());
   }
 
@@ -589,6 +662,68 @@ auto FluidRenderer::UploadLights() -> void
   // Upload number of lights
   GLCall(glBufferSubData(GL_UNIFORM_BUFFER, numLightsFieldOffset, sizeof(int), &numLights));
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
+}
+
+void FluidRenderer::RenderMeshes()
+{
+    if (m_scene.lightingParameters.renderShadows)
+    {
+      m_meshesShadowPass->Render();
+      m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
+    }
+    // Places light model in the scene
+    if (m_scene.lightingParameters.showLightsOnScene)
+    {
+      // Positions light model in the same position as the light, and set color accordingly
+      auto lightPos = m_scene.lights[0].position;
+      auto lightColor = m_scene.lights[0].diffuse;
+      m_lightModel.SetTranslation({ lightPos.x, lightPos.y, lightPos.z });
+      m_lightModel.GetMaterial().diffuse = { lightColor.x, lightColor.y, lightColor.z };
+      m_scene.models.push_back(m_lightModel);
+    }
+
+    if (m_meshesPass->HasSkybox()) m_meshesPass->SetInputTexture({ m_meshesPass->GetSkybox()
+      .GetTextureID(), 1, TextureType::Cubemap });
+    else m_meshesPass->SetInputTexture({ 0, 1, TextureType::Cubemap });
+    m_meshesPass->SetInputTexture({ m_fluidShadowPass->GetBuffer(), 2 });
+    m_meshesPass->SetInputTexture({ m_thicknessShadowPass->GetBuffer(), 3 });
+
+    // Set background clear color (comes from meshes rendering, for now)
+    m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
+    m_meshesPass->Render();
+
+    // Remove light model from scene so it does not affect other passes
+    if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
+}
+void FluidRenderer::DoFiltering()
+{
+    if (m_scene.filteringParameters.filter1D)
+    {
+      auto& narrowRangeFilterShader = m_filterPass->GetShader();
+      for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+      {
+        if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+        else m_filterPass->SwapBuffers();
+
+        narrowRangeFilterShader.Bind();
+        narrowRangeFilterShader.SetUniform1i("u_FilterDirection", 0);
+        m_filterPass->Render();
+        m_filterPass->SwapBuffers();
+        
+        narrowRangeFilterShader.Bind();
+        narrowRangeFilterShader.SetUniform1i("u_FilterDirection", 1);
+        m_filterPass->Render();
+      }
+    }
+    else
+    {
+      for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+      {
+        if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+        else m_filterPass->SwapBuffers();
+        m_filterPass->Render();
+      }
+    }
 }
 
 }

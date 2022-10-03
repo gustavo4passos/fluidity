@@ -75,12 +75,16 @@ int main(int argc, char* args[])
     fluidity::FluidRenderer* renderer;
     renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0.06250);
 
+    fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
+    gui.Init();
+
     if (!cmdLineArgs.scenePath.empty())
     {
         fluidity::SceneSerializer ss(cmdLineArgs.scenePath);
         ss.Deserialize();
         fluidity::Scene sc = ss.GetScene();
         renderer->SetScene(sc);
+        gui.SetSceneSerializer(ss);
     }
     else renderer->SetScene(fluidity::Scene::CreateEmptyScene());
 
@@ -90,8 +94,6 @@ int main(int argc, char* args[])
         return 6;
     }
 
-    fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
-    gui.Init();
 
     bool running = true;
     bool showGui = true;

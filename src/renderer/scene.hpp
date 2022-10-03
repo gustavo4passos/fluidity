@@ -28,7 +28,7 @@ struct Scene
     {
         return {
             {}, // Fluid
-            { 4, 7, 100, false }, // Filtering parameters
+            { 4, 7, 100, false, true, false }, // Filtering parameters
             { 0.25, true, 0.0625 }, // Fluid parameters
             { 0.00100000005, 0.00999999978, 0.5, true, true }, // Lighting paremeters
             { { 17, 8, 0.5 } }, // Camera

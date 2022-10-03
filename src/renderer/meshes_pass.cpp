@@ -49,7 +49,6 @@ void MeshesPass::Render()
     float minusInfinity = -1000000.f;
     GLCall(glClearBufferfv(GL_COLOR, 1, &minusInfinity));
 
-
     m_shader->Bind();
     BindTextures();
 
@@ -71,13 +70,14 @@ void MeshesPass::Render()
         }
         
         const auto& material = model.GetMaterial();
-        auto diffuse = material.diffuse;
-        auto specular = material.specular;
+        auto diffuse         = material.diffuse;
+        auto specular        = material.specular;
         m_shader->SetUniform1i("uInvertNormals", model.GetHideFrontFaces() ? 1 : 0, true);
         m_shader->SetUniform3f("uDiffuse", diffuse.x, diffuse.y, diffuse.z, true);
         m_shader->SetUniform3f("uSpecular", specular.x, specular.y, specular.z, true);
         m_shader->SetUniform1f("uShininess", material.shininess, true);
         m_shader->SetUniform1i("uEmissive", material.emissive ? 1 : 0, true);
+        m_shader->SetUniform1f("uReflectiveness", material.reflectiveness, true);
 
         vec3 modelTranslation = model.GetTranslation();
         vec3 modelScale       = model.GetScale();
@@ -140,6 +140,7 @@ void MeshesPass::RenderSkybox(const RenderState& previousRenderState)
 
     m_skybBoxShader->Bind();
     GLCall(glBindVertexArray(m_skybox.GetVao()));
+    GLCall(glActiveTexture(GL_TEXTURE0));
     GLCall(glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox.GetTextureID()));
     GLCall(glDrawArrays(GL_TRIANGLES, 0, 36));
 

@@ -110,7 +110,7 @@ void FilterPass::SwapBuffers(int textureSlot)
   assert(m_useDoubleBuffer);
 
   // Set current render target as input texture
-  SetInputTexture(m_framebuffer.GetAttachment(0));
+  SetInputTexture({ m_framebuffer.GetAttachment(0) });
 
   m_framebuffer.Bind();
   m_framebuffer.SwapRenderTargets();

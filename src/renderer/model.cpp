@@ -13,7 +13,8 @@ Model::Model(const std::string& filePath, bool genSmoothNormals)
         { 0.4f, 0.4f, 0.4f },
         { 1.f,  1.f,  1.f },
         32.f,
-        false
+        false,
+        0.f
         }
 { /* */ }
 
