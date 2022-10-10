@@ -39,14 +39,15 @@ uniform int   u_ScreenHeight;
 in vec3      f_ViewCenter;
 flat in mat3 f_AnisotropyMatrix;
 
-out float outDepth;
+out vec3 outDepth;
 
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 void main()
 {
     vec3 viewDir = normalize(f_ViewCenter);
     vec3 normal;
-    vec3 fragPos;
+    vec3 fragPosFront;
+    vec3 fragPosBack;
 
     if(u_UseAnisotropyKernel == 0) {
         normal.xy = gl_PointCoord.xy * vec2(2.0, -2.0) + vec2(-1.0, 1.0);
@@ -56,7 +57,9 @@ void main()
             discard;           // kill pixels outside circle
         }
         normal.z = sqrt(1.0 - mag);
-        fragPos  = f_ViewCenter + normal * u_PointRadius;
+        fragPosFront  = f_ViewCenter + normal * u_PointRadius;
+
+        fragPosBack   = f_ViewCenter + normal * vec3(1, 1, -1) * u_PointRadius;
     } else {
         vec3 fc = gl_FragCoord.xyz;
         fc.xy /= vec2(u_ScreenWidth, u_ScreenHeight);
@@ -82,12 +85,13 @@ void main()
         }
         float d                  = -tmp - sqrt(delta);
         vec3  intersectionPointT = camT + rayDirT * d;
-        fragPos = transMatrix * intersectionPointT;;
+        fragPosFront = transMatrix * intersectionPointT;;
     }
 
     //calculate depth
-    vec4 clipSpacePos = projectionMatrix * vec4(fragPos, 1.0);
-    outDepth = fragPos.z;
+    vec4 clipSpacePos = projectionMatrix * vec4(fragPosFront, 1.0);
+    outDepth = vec3(fragPosFront.z, -fragPosBack.z, 1);
 
-    gl_FragDepth = (clipSpacePos.z / clipSpacePos.w) * 0.5 + 0.5;
+    // Color blending is being used to determine depth with GL_MAX
+    // gl_FragDepth = (clipSpacePos.z / clipSpacePos.w) * 0.5 + 0.5;
 }

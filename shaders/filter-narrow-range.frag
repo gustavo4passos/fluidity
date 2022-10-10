@@ -48,7 +48,7 @@ uniform int u_DoFilter1D;
 uniform int u_FilterDirection;
 
 in vec2   f_TexCoord;
-out float outDepth;
+out vec3  outDepth;
 
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 const int   fixedFilterRadius = 4;
@@ -108,57 +108,72 @@ void ModifiedGaussianFilter2D(inout float sampleDepth, inout float weight, inout
 }
 
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-float filter1D(float pixelDepth)
+vec2 filter1D(vec2 pixelDepth)
 {
     if(u_FilterSize == 0) {
         return pixelDepth;
     }
 
+    // Depth indepentent parameters
     vec2  blurRadius = vec2(1.0 / u_ScreenWidth, 1.0 / u_ScreenHeight);
     float threshold  = u_ParticleRadius * thresholdRatio;
     float ratio      = u_ScreenHeight / 2.0 / tan(PI_OVER_8);
     float K          = -u_FilterSize * ratio * u_ParticleRadius * 0.1f;
-    int   filterSize = min(u_MaxFilterSize, int(ceil(K / pixelDepth)));
+    vec4  dtc        = (u_FilterDirection == 0) ? vec4(blurRadius.x, 0, -blurRadius.x, 0) : vec4(0, blurRadius.y, 0, -blurRadius.y);
 
-    float upper       = pixelDepth + threshold;
-    float lower       = pixelDepth - threshold;
-    float lower_clamp = pixelDepth - u_ParticleRadius * clampRatio;
-
-    float sigma      = filterSize / 3.0f;
-    float two_sigma2 = 2.0f * sigma * sigma;
-
-    vec2 sum2  = vec2(pixelDepth, 0);
-    vec2 wsum2 = vec2(1, 0);
-    vec4 dtc   = (u_FilterDirection == 0) ? vec4(blurRadius.x, 0, -blurRadius.x, 0) : vec4(0, blurRadius.y, 0, -blurRadius.y);
+    ivec2 filterSize = ivec2(min(u_MaxFilterSize, int(ceil(K / pixelDepth.r))), min(u_MaxFilterSize, int(ceil(K / pixelDepth.g))));
+    vec2  sigma      = filterSize / 3.0f;
+    vec2  two_sigma2 = 2.0f * sigma * sigma;
 
     vec4  f_tex = f_TexCoord.xyxy;
     float r     = 0;
     float dr    = dtc.x + dtc.y;
 
-    float upper1 = upper;
-    float upper2 = upper;
-    float lower1 = lower;
-    float lower2 = lower;
-    vec2  sampleDepth;
-    vec2  w2;
+    vec2 upper       = pixelDepth + vec2(threshold);
+    vec2 lower       = pixelDepth - vec2(threshold);
+    vec2 lower_clamp = pixelDepth - vec2(u_ParticleRadius * clampRatio);
 
-    for(int x = 1; x <= filterSize; ++x) {
+    vec2 sum2r  = vec2(pixelDepth.r, 0);
+    vec2 wsum2r = vec2(1, 0);
+
+    vec2 sum2g  = vec2(pixelDepth.g, 0);
+    vec2 wsum2g = vec2(1, 0);
+
+    vec2 upper1 = upper;
+    vec2 upper2 = upper;
+    vec2 lower1 = lower;
+    vec2 lower2 = lower;
+    vec4 sampleDepth;
+    vec2 w2r;
+    vec2 w2g;
+
+    for(int x = 1; x <= filterSize.r; ++x) {
         f_tex += dtc;
         r     += dr;
 
-        sampleDepth.x = texture(u_DepthTex, f_tex.xy).r;
-        sampleDepth.y = texture(u_DepthTex, f_tex.zw).r;
+        sampleDepth.xy = texture(u_DepthTex, f_tex.xy).rg;
+        sampleDepth.zw = texture(u_DepthTex, f_tex.zw).rg;
 
-        w2 = vec2(compute_weight1D(r, two_sigma2));
-        ModifiedGaussianFilter1D(sampleDepth.x, w2.x, w2.y, upper1, lower1, lower_clamp, threshold);
-        ModifiedGaussianFilter1D(sampleDepth.y, w2.y, w2.x, upper2, lower2, lower_clamp, threshold);
+        // Front face
+        w2r = vec2(compute_weight1D(r, two_sigma2.r));
+        ModifiedGaussianFilter1D(sampleDepth.x, w2r.x, w2r.y, upper1.r, lower1.r, lower_clamp.r, threshold);
+        ModifiedGaussianFilter1D(sampleDepth.z, w2r.y, w2r.x, upper2.r, lower2.r, lower_clamp.r, threshold);
 
-        sum2  += sampleDepth * w2;
-        wsum2 += w2;
+        sum2r  += sampleDepth.xz * w2r;
+        wsum2r += w2r;
+
+        // Back face
+        w2g = vec2(compute_weight1D(r, two_sigma2.g));
+        ModifiedGaussianFilter1D(sampleDepth.y, w2g.x, w2g.y, upper1.g, lower1.g, lower_clamp.g, threshold);
+        ModifiedGaussianFilter1D(sampleDepth.w, w2g.y, w2g.x, upper2.g, lower2.g, lower_clamp.g, threshold);
+
+        sum2g  += sampleDepth.yw * w2g;
+        wsum2g += w2g;
     }
 
-    vec2 filterVal = vec2(sum2.x, wsum2.x) + vec2(sum2.y, wsum2.y);
-    return filterVal.x / filterVal.y;
+    vec2 filterValR = vec2(sum2r.x, wsum2r.x) + vec2(sum2r.y, wsum2r.y);
+    vec2 filterValG = vec2(sum2g.x, wsum2g.x) + vec2(sum2g.y, wsum2g.y);
+    return vec2(filterValR.x / filterValR.y, filterValG.x / filterValG.y);
 }
 
 float filter2D(float pixelDepth)
@@ -228,11 +243,11 @@ float filter2D(float pixelDepth)
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 void main()
 {
-    float pixelDepth = texture(u_DepthTex, f_TexCoord).r;
+    vec4 pixelDepth = texture(u_DepthTex, f_TexCoord);
 
-    if(pixelDepth > 0.0 || pixelDepth < -1000.0f) {
-        outDepth = pixelDepth;
+    if(pixelDepth.b < 0) {
+        outDepth = pixelDepth.rgb;
     } else {
-        outDepth = (u_DoFilter1D == 1) ? filter1D(pixelDepth) : filter2D(pixelDepth);
+        outDepth = (u_DoFilter1D == 1) ? vec3(filter1D(pixelDepth.rg), 1.0) : vec3(filter2D(pixelDepth.r), pixelDepth.g, pixelDepth.b);
     }
 }

@@ -29,9 +29,9 @@ struct Scene
         return {
             {}, // Fluid
             { 4, 7, 100, false, true, false }, // Filtering parameters
-            { 0.25, true, 0.0625 }, // Fluid parameters
+            { 0.25, true, 0.0625, 1.0, false, 0.0 }, // Fluid parameters
             { 0.00100000005, 0.00999999978, 0.5, true, true }, // Lighting paremeters
-            { { 17, 8, 0.5 } }, // Camera
+            { Camera::GetDefaultPosition() }, // Camera
             {
                 { 0.2, 0.2, 0.2, 0.2 },
                 { 1, 1, 1, 1 },
@@ -44,6 +44,7 @@ struct Scene
             { .5f, .5f, .5f, 1.f }
         };
     }
+    
 };
 
 

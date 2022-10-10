@@ -69,6 +69,8 @@ private:
   MeshesPass*         m_meshesPass;
   MeshesPass*         m_meshesShadowPass;
 
+  FilterPass*         m_inverterPass;
+
   CameraController m_cameraController;
 
   // Useful for performing operations that affect every render pass

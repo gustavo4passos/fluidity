@@ -13,6 +13,7 @@ struct RenderState
   bool useBlend                 = false;
   GLenum blendSourceFactor      = GL_ONE;
   GLenum blendDestinationFactor = GL_ZERO;
+  GLenum blendEquation          = GL_FUNC_ADD;
   Vec4 clearColor               = { 0.f, 0.f, 0.f, 1.f };
   bool cullFaceEnabled          = false;
   GLenum cullFaceMode           = GL_BACK;

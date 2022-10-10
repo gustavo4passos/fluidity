@@ -28,11 +28,14 @@ struct YAML::convert<fluidity::FluidParameters>
 {
     static bool decode(const YAML::Node& node, fluidity::FluidParameters& fp)
     {
-        if (!node.IsSequence() || node.size() != 3) return false;
+        if (!node.IsSequence() || node.size() < 3) return false;
 
         fp.attenuation       = node[0].as<float>();
         fp.transparentFluid  = node[1].as<bool>();
         fp.pointRadius       = node[2].as<float>();
+
+        if (node.size() > 3) fp.refractionModifier = node[3].as<float>();
+        if (node.size() > 4) fp.twoSidedRefractions = node[4].as<bool>();
         return true;
     }
 };
@@ -198,7 +201,8 @@ YAML::Emitter& operator << (YAML::Emitter& out, const FluidParameters& fluidPara
 {
     const FluidParameters& fp = fluidParameters;
     out << YAML::Flow;
-    out << YAML::BeginSeq << fp.attenuation << fp.transparentFluid << fp.pointRadius;
+    out << YAML::BeginSeq << fp.attenuation << fp.transparentFluid 
+      << fp.pointRadius << fp.refractionModifier << fp.twoSidedRefractions;
     out << YAML::EndSeq;
 
     return out;

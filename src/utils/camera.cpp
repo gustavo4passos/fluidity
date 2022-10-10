@@ -11,8 +11,8 @@ Camera::Camera(const glm::vec3& position, float fov, float aspectRatio)
   m_aspectRatio(aspectRatio)
 {
     // TODO: These should not be hardcoded
-    m_yaw = 177;
-    m_pitch = -21;
+    m_yaw = GetDefaultYaw();
+    m_pitch = GetDefaultPitch();
 } 
 
  
@@ -28,6 +28,13 @@ const glm::mat4 Camera::GetViewMatrix()
 
   glm::mat4 view = glm::lookAt(m_position, target, up);
   return view;
+}
+
+void Camera::Reset()
+{
+  m_position = GetDefaultPosition();
+  m_yaw      = GetDefaultYaw();
+  m_pitch    = GetDefaultPitch();
 }
 
 }

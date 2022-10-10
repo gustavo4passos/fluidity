@@ -30,9 +30,16 @@ namespace fluidity
     const float GetPitch() const { return m_pitch; }
     void SetPitch(float pitch) { m_pitch = pitch; }
 
+    // Reset default pos, yaw and pitch
+    void Reset();
+
     static constexpr float NEAR_PLANE = 0.1f;
     static constexpr float FAR_PLANE  = 1000.f;
     static constexpr glm::vec3 UP = { 0.f, 1.f, 0.f };
+
+    static glm::vec3 GetDefaultPosition() { return { 17, 9, 0.5 }; } 
+    static float GetDefaultYaw() { return 177; }
+    static float GetDefaultPitch() { return -21; }  
 
   private:
     glm::vec3 m_position;

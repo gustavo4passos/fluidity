@@ -8,24 +8,21 @@ namespace fluidity
 FilterPass::FilterPass(
     int bufferWidth,
     int bufferHeight,
-    const FramebufferAttachment& renderTargetSpecification,
+    const std::vector<FramebufferAttachment>& attachments,
     const std::string& fsFilePath,
     const bool useDoubleBuffer
     )
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
     m_fsFilePath(fsFilePath),
-    m_renderTargetSpecification(renderTargetSpecification),
     m_useDoubleBuffer(useDoubleBuffer)
 { 
+  for (const auto& att : attachments) m_framebuffer.PushAttachment(att);
   m_renderState.useDepthTest = false;
 }
 
 bool FilterPass::Init()
 {
   m_shader = new Shader("../../shaders/quad_rendering.vert", m_fsFilePath);
-  m_framebuffer.PushAttachment({ m_renderTargetSpecification.internalFormat, 
-      m_renderTargetSpecification.pixelFormat, m_renderTargetSpecification.dataType
-  });
 
   if (m_useDoubleBuffer) m_framebuffer.DuplicateAttachment(0);
   if (!RenderPass::Init()) return false;

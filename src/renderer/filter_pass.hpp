@@ -11,7 +11,7 @@ public:
     FilterPass(
       int bufferWidth,
       int bufferHeight,
-      const FramebufferAttachment& renderTargetSpecification,
+      const std::vector<FramebufferAttachment>& attachments,
       const std::string& fsFilePath,
       const bool useDoubleBuffer = false
 );
@@ -27,7 +27,6 @@ protected:
     void InitQuadVao();
 
     std::string m_fsFilePath;
-    FramebufferAttachment m_renderTargetSpecification;
     bool m_useDoubleBuffer;
 
     GLuint m_quadVao;

@@ -53,7 +53,7 @@ auto FluidRenderer::Init() -> bool
       m_windowHeight,
       0,
       currentVao,
-      { GL_R32F, GL_RED, GL_FLOAT },
+      { GL_RGB32F, GL_RGB, GL_FLOAT },
       "../../shaders/depth-pass.vert",
       "../../shaders/depth-pass.frag"
   );
@@ -71,22 +71,41 @@ auto FluidRenderer::Init() -> bool
   m_normalPass = new FilterPass(
       m_windowWidth,
       m_windowHeight,
-      { GL_RGB32F, GL_RGB, GL_FLOAT },
-      "../../shaders/normal-pass.frag"
+      {
+        { GL_RGB32F, GL_RGB, GL_FLOAT }
+      },
+      "../../shaders/dual-normal-pass.frag",
+      true
   );
 
   m_filterPass = new FilterPass(
       m_windowWidth,
       m_windowHeight,
-      { GL_R32F, GL_RED, GL_FLOAT },
+      {
+        { GL_RGB32F, GL_RGB, GL_FLOAT }
+      },
       "../../shaders/filter-narrow-range.frag",
       true
+  );
+
+  // Used to invert the g component of the dual peeled depth textures.
+  // Depth in those textures are saved as vec3(frontD, -backD, 0, 1),
+  // So this pass transforms -backD to backD for further passes
+  m_inverterPass = new FilterPass(
+      m_windowWidth,
+      m_windowHeight,
+      {
+        { GL_RGB32F, GL_RGB, GL_FLOAT }
+      },
+      "../../shaders/inverter.frag"
   );
 
   m_compositionPass = new FilterPass(
     m_windowWidth,
     m_windowHeight,
-    { GL_RGBA32F, GL_RGBA, GL_FLOAT },
+    { 
+      { GL_RGBA32F, GL_RGBA, GL_FLOAT },
+    },
     "../../shaders/composition-pass.frag"
   );
 
@@ -143,6 +162,7 @@ auto FluidRenderer::Init() -> bool
   m_renderPasses["MeshesShadowPass"]   = m_meshesShadowPass;
   m_renderPasses["FluidShadowPass"]    = m_fluidShadowPass;
   m_renderPasses["ThicknessShadow"]    = m_thicknessShadowPass;
+  m_renderPasses["InverterPass"]       = m_inverterPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -157,6 +177,15 @@ auto FluidRenderer::Init() -> bool
   {
     LOG_ERROR("Unable to initialize texture renderer.");
     return false;  
+  }
+
+  // Depth pass -> Setup
+  {
+    auto renderState = m_depthPass->GetRenderState();
+    renderState.useBlend                = true;
+    renderState.useDepthTest            = false;
+    renderState.blendEquation           = GL_MAX;
+    m_depthPass->SetRenderState(renderState);
   }
 
   // Thickness pass -> Setup
@@ -445,18 +474,23 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
   {
     auto& compositionPassShader = m_compositionPass->GetShader();
     compositionPassShader.Bind();
-    compositionPassShader.SetUniform1i("u_HasSolid", 1);
-    compositionPassShader.SetUniform1i("u_DepthTex",            0);
-    compositionPassShader.SetUniform1i("u_ThicknessTex",        1);
-    compositionPassShader.SetUniform1i("u_NormalTex",           2);
-    compositionPassShader.SetUniform1i("u_BackgroundTex",       3);
-    compositionPassShader.SetUniform1i("u_SolidDepthMap",       4);
-    compositionPassShader.SetUniform1i("u_SolidShadowMaps[0]",  5);
-    compositionPassShader.SetUniform1i("u_SkyBoxTex",           6);
+    compositionPassShader.SetUniform1i("u_ScreenWidth",   m_windowWidth);
+    compositionPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
+    compositionPassShader.SetUniform1i("u_DepthTex",                  0);
+    compositionPassShader.SetUniform1i("u_HasSolid",                  1);
+    compositionPassShader.SetUniform1i("u_DepthTex",                  0);
+    compositionPassShader.SetUniform1i("u_ThicknessTex",              1);
+    compositionPassShader.SetUniform1i("u_FrontNormalTex",            2);
+    compositionPassShader.SetUniform1i("u_BackgroundTex",             3);
+    compositionPassShader.SetUniform1i("u_SolidDepthMap",             4);
+    compositionPassShader.SetUniform1i("u_SolidShadowMaps[0]",        5);
+    compositionPassShader.SetUniform1i("u_SkyBoxTex",                 6);
+#if ENABLE_COMPOSITION_SHADOWS
+    compositionPassShader.SetUniform1i("u_FluidShadowMaps[0]",        7);
+    compositionPassShader.SetUniform1i("u_FluidShadowThickness[0]",   8);
+#endif
+    compositionPassShader.SetUniform1i("u_BackNormalTex",             9);
     compositionPassShader.SetUniform1i("u_TransparentFluid", fluidParameters.transparentFluid ? 1 : 0);
-    compositionPassShader.SetUniform1f("u_ReflectionConstant", 0.f);
-    compositionPassShader.SetUniform1i("u_FluidShadowMaps[0]", 7);
-    compositionPassShader.SetUniform1i("u_FluidShadowThickness[0]", 8);
     compositionPassShader.Unbind();
   }
 
@@ -521,8 +555,10 @@ void FluidRenderer::SetUpPerFrameUniforms()
 #endif
 
   compositionPassShader.SetUniform1f("u_AttennuationConstant", fluidParameters.attenuation);
+  compositionPassShader.SetUniform1i("uTwoSidedRefractions", fluidParameters.twoSidedRefractions ? 1 : 0);
   compositionPassShader.SetUniform1f("uRefractionModifier", fluidParameters.refractionModifier);
   compositionPassShader.SetUniform1i("uUseRefractionMask", filteringParameters.useRefractionMask ? 1 : 0);
+  compositionPassShader.SetUniform1f("u_ReflectionConstant", fluidParameters.reflectionConstant);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
@@ -549,6 +585,10 @@ void FluidRenderer::SetUpPerFrameUniforms()
   fluidShadowShader.Bind();
   fluidShadowShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
   fluidShadowShader.SetUniform1i("u_LightID", 0);
+
+  auto& normalPassShader = m_normalPass->GetShader();
+  normalPassShader.Bind();
+  normalPassShader.SetUniform1i("u_frontAndBackNormals", fluidParameters.twoSidedRefractions ? 1 : 0);
 
   m_textureRenderer->SetGammaCorrectionEnabled(filteringParameters.gammaCorrection);
 }
@@ -579,7 +619,7 @@ auto FluidRenderer::Render() -> void
     DoFiltering();
     
     depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
-      m_depthPass->GetBuffer();
+      m_inverterPass->GetBuffer();
 
     m_normalPass->SetInputTexture(depthTexture);
     m_normalPass->Render();
@@ -591,14 +631,15 @@ auto FluidRenderer::Render() -> void
     m_compositionPass->SetInputTexture({ m_meshesShadowPass->GetBuffer(0),    5 });
     m_compositionPass->SetInputTexture({ m_filterPass->GetBuffer(0),          7 });
     m_compositionPass->SetInputTexture({ m_thicknessShadowPass->GetBuffer(0), 8 });
+    m_compositionPass->SetInputTexture({ m_normalPass->GetBuffer(1),          9 });
     
     // TODO: This needs to be done at the render pass level
     if (m_meshesPass->HasSkybox())
     {
       GLuint skyboxTextureID = m_meshesPass->GetSkybox().GetTextureID();
-      glActiveTexture(GL_TEXTURE0 + 6);
-      glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTextureID);
+      m_compositionPass->SetInputTexture({ skyboxTextureID, 6, TextureType::Cubemap });
     }
+    else m_compositionPass->SetInputTexture({ 0, 6, TextureType::Cubemap });
     m_compositionPass->Render();
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
@@ -612,8 +653,8 @@ auto FluidRenderer::Render() -> void
       auto& meshesPassShader = m_meshesPass->GetShader();
       meshesPassShader.Bind();
       meshesPassShader.SetUniform1i("uRenderFluidShadows", 0);
-      RenderMeshes();
     }
+    RenderMeshes();
     m_textureRenderer->SetTexture(m_meshesPass->GetBuffer());
   }
 
@@ -695,14 +736,24 @@ void FluidRenderer::RenderMeshes()
     // Remove light model from scene so it does not affect other passes
     if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
 }
+
 void FluidRenderer::DoFiltering()
 {
+    GLuint depthTexture;
+    if (m_scene.fluidParameters.twoSidedRefractions)
+    {
+      m_inverterPass->SetInputTexture(m_depthPass->GetBuffer());
+      m_inverterPass->Render();
+      depthTexture = m_inverterPass->GetBuffer();
+    }
+    else depthTexture = m_depthPass->GetBuffer();
+
     if (m_scene.filteringParameters.filter1D)
     {
       auto& narrowRangeFilterShader = m_filterPass->GetShader();
       for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
       {
-        if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+        if (i == 0) m_filterPass->SetInputTexture(depthTexture);
         else m_filterPass->SwapBuffers();
 
         narrowRangeFilterShader.Bind();
@@ -719,7 +770,7 @@ void FluidRenderer::DoFiltering()
     {
       for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
       {
-        if (i == 0) m_filterPass->SetInputTexture(m_depthPass->GetBuffer());
+        if (i == 0) m_filterPass->SetInputTexture(depthTexture);
         else m_filterPass->SwapBuffers();
         m_filterPass->Render();
       }

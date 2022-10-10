@@ -38,6 +38,36 @@ bool GuiLayer::ProcessEvent(const SDL_Event& e)
     ImGuiIO& io = ImGui::GetIO();
     ImGui_ImplSDL2_ProcessEvent(&e);
 
+    if (e.type == SDL_KEYDOWN)
+    {
+      if (e.key.keysym.sym == SDLK_LCTRL) m_ctrlPressed = true;
+      else if (m_ctrlPressed)
+      {
+        if (e.key.keysym.sym == SDLK_o) 
+        {
+          LoadNewScene();
+          m_ctrlPressed = false;
+          return true;
+        }
+        if (e.key.keysym.sym == SDLK_s)
+        {
+          SaveScene();
+          m_ctrlPressed = false;
+          return true;
+        }
+        if (e.key.keysym.sym == SDLK_n)
+        {
+          NewScene();
+          m_ctrlPressed = false;
+          return true;
+        }
+      }
+    }
+    else if (e.type == SDL_KEYUP)
+    {
+      if (e.key.keysym.sym == SDLK_LCTRL) m_ctrlPressed = false;
+    }
+
     if (io.WantCaptureMouse) return true;
     return false;
 }
@@ -104,6 +134,7 @@ void GuiLayer::RenderParametersWindow()
             auto& filteringParameters = m_fluidRenderer->m_scene.filteringParameters;
 
             ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
+            ImGui::DragFloat("Reflection Constant", (float*)&fluidParameters.reflectionConstant, 0.005f, 0.f, 1.f);
             ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0005, 0.0001);
             ImGui::DragFloat("Refraction Modifier", (float*)&fluidParameters.refractionModifier, 0.0005, 0.0001, 5, "%.4f");
 
@@ -115,6 +146,7 @@ void GuiLayer::RenderParametersWindow()
             ImGui::DragFloat("Shininess##fluidMaterial", (float*)&material.shininess, 0.5, 0, 1000);
             
             ImGui::Separator();
+            ImGui::Checkbox("Two Sided Refractions", &fluidParameters.twoSidedRefractions);
             ImGui::Checkbox("Transparent", &fluidParameters.transparentFluid);
             ImGui::SliderInt("Iterations", &filteringParameters.nIterations, 0, 20);
             ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
@@ -324,21 +356,19 @@ void GuiLayer::RenderMainMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("New Scene"))
+            if (ImGui::MenuItem("New Scene", "Ctrl + N"))
             {
-                m_fluidRenderer->SetScene(Scene::CreateEmptyScene());
-                m_fluidRenderer->LoadScene();
-                m_sceneSerializer = SceneSerializer();
+              NewScene();
             }
 
-            if (ImGui::MenuItem("Load Scene"))
+            if (ImGui::MenuItem("Load Scene", "Ctrl + O"))
             {
                 LoadNewScene();
             }
 
             ImGui::Separator();
             ImGui::Spacing();
-            if (ImGui::MenuItem("Save Scene"))
+            if (ImGui::MenuItem("Save Scene", "Ctrl + S"))
             {
                 SaveScene();
             }
@@ -485,6 +515,13 @@ void GuiLayer::SaveSceneAs()
         m_sceneSerializer = SceneSerializer(sc, sceneFileName);
         m_sceneSerializer.Serialize();
     }
+}
+
+void GuiLayer::NewScene()
+{
+    m_fluidRenderer->SetScene(Scene::CreateEmptyScene());
+    m_fluidRenderer->LoadScene();
+    m_sceneSerializer = SceneSerializer();
 }
 
 void GuiLayer::LoadModel()

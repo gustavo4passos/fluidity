@@ -174,11 +174,8 @@ float getLightSpaceDepth(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 void main()
 {
     // vec3 color = vec3(233.0 / 255.0, 116.0 / 255.0, 81.0 / 255.0);
-    // float ambient = 0.2;
     // fragColor = vec3(149.0 / 255.0, 69.0 / 255.0, 53.0 / 255.0); // Chestnut color
     vec3 normal   = normalize(fNormal);
-    // Point light
-    // vec3 lightDir = normalize(lights[0].position.xyz - fFragPos);
 
     vec3 lightDir = normalize(fFragPos - lights[0].position.xyz);
     vec3 viewDir = normalize(camPosition.xyz - fFragPos);
@@ -192,7 +189,6 @@ void main()
     vec3 fluidShadow = vec3(1);
 
     float lightSpaceDepth;
-    float g;
     if (uRenderShadows == 1 || uRenderFluidShadows == 1)
     {
         if (uUsePcf == 1)
@@ -207,8 +203,6 @@ void main()
             
             if (uRenderFluidShadows == 1) fluidShadowData = inFluidShadowPCF(fFragPosLightSpace, normal, lightDir);
             if (uRenderShadows == 1) solidShadowData = inSolidShadowPCF(fFragPosLightSpace, normal, lightDir);
-
-            g = solidShadowData.depth;
 
             lightSpaceDepth = getLightSpaceDepth(fFragPosLightSpace, normal, lightDir);
             if (solidShadowData.shadowLevel > 0 || fluidShadowData.shadowLevel > 0)

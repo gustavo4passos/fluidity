@@ -14,7 +14,7 @@ public:
     int bufferHeight,
     const std::string& vsFilePath,
     const std::string& fsFilePath,
-    const std::vector<FramebufferAttachment> attachments,
+    const std::vector<FramebufferAttachment>& attachments,
     Scene* scene
     );
 

@@ -68,9 +68,8 @@ int main(int argc, char* args[])
     if(!window.Init()) 
     {
         LOG_ERROR("Unable to create window..");
-        return 0;
+        return 1;
     }
-    else LOG_WARNING("Window successfully created.");
 
     fluidity::FluidRenderer* renderer;
     renderer = new fluidity::FluidRenderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0.06250);
@@ -78,22 +77,27 @@ int main(int argc, char* args[])
     fluidity::GuiLayer gui = fluidity::GuiLayer(window.GetSDLWindow(), window.GetSDLGLContext(), renderer);
     gui.Init();
 
+    fluidity::Scene sc;
+
     if (!cmdLineArgs.scenePath.empty())
     {
         fluidity::SceneSerializer ss(cmdLineArgs.scenePath);
-        ss.Deserialize();
-        fluidity::Scene sc = ss.GetScene();
-        renderer->SetScene(sc);
-        gui.SetSceneSerializer(ss);
+        if (ss.Deserialize())
+        {
+          sc = ss.GetScene();
+          gui.SetSceneSerializer(ss);
+        }
+        else sc = fluidity::Scene::CreateEmptyScene();
     }
-    else renderer->SetScene(fluidity::Scene::CreateEmptyScene());
+    else sc = fluidity::Scene::CreateEmptyScene();
+
+    renderer->SetScene(sc);
 
     if(!renderer->Init())
     {
         LOG_ERROR("Unable to initialize fluid renderer.");
         return 6;
     }
-
 
     bool running = true;
     bool showGui = true;

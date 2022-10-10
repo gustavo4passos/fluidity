@@ -48,7 +48,10 @@ void RenderPass::ChangeOpenGLRenderState(const RenderState& state)
 
   if (state.cullFaceEnabled) glEnable(GL_CULL_FACE);
   else glDisable(GL_CULL_FACE);
+
   glCullFace(state.cullFaceMode);
+
+  glBlendEquation(state.blendEquation);
 }
 
 RenderState RenderPass::GetCurrentOpenGLRenderState()
@@ -62,6 +65,7 @@ RenderState RenderPass::GetCurrentOpenGLRenderState()
   Vec4 currentClearColor;
   GLboolean cullFaceEnabled;
   GLint cullFaceMode;
+  GLint blendEquation;
 
   GLCall(glGetBooleanv(GL_DEPTH_TEST, &depthTestEnabled));
   GLCall(glGetBooleanv(GL_BLEND, &blendEnabled));
@@ -70,9 +74,11 @@ RenderState RenderPass::GetCurrentOpenGLRenderState()
   GLCall(glGetFloatv(GL_COLOR_CLEAR_VALUE, (float*)(&currentClearColor)));
   GLCall(glGetBooleanv(GL_CULL_FACE, &cullFaceEnabled));
   GLCall(glGetIntegerv(GL_CULL_FACE_MODE, &cullFaceMode));
+  GLCall(glGetIntegerv(GL_BLEND_EQUATION_RGB, &blendEquation));
 
   return { (bool)depthTestEnabled, (bool)blendEnabled, (GLenum)blendSourceFactor, 
-    (GLenum)blendDestinationFactor, currentClearColor, (bool)cullFaceEnabled, (GLenum)cullFaceMode };
+    (GLenum)blendDestinationFactor, (GLenum)blendEquation, currentClearColor, 
+    (bool)cullFaceEnabled, (GLenum)cullFaceMode };
 }
 
 

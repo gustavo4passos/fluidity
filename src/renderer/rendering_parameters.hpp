@@ -19,6 +19,8 @@ struct FluidParameters
   bool  transparentFluid;
   float pointRadius;
   float refractionModifier = 1.0;
+  bool  twoSidedRefractions = false;
+  float reflectionConstant = 0.0;
 };
 
 struct LightingParameters

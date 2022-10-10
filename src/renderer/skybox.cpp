@@ -24,35 +24,58 @@ bool Skybox::Init()
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);  
 
-    std::vector<std::string> faces =
+    std::vector<std::vector<std::string>> faces =
     {
-        "right.jpg",
-        "left.jpg",
-        "top.jpg",
-        "bottom.jpg",
-        "front.jpg",
-        "back.jpg"
+      { "right",  "posx" },
+      { "left",   "negx" },
+      { "top",    "posy" },
+      { "bottom", "negy" },
+      { "front",  "posz" },
+      { "back",   "negz" }
     };
 
     // Load textures
     int width, height, nChannels;
 
-    for (int i = 0; i < faces.size(); i++)
+    int i = 0;
+    for (const auto& face : faces)
     {
-        unsigned char* data = stbi_load((m_folderPath + "/" + faces[i]).c_str(),
+      unsigned char* data = nullptr;
+      for (const auto& posFaceName : face)
+      {
+        data = stbi_load((m_folderPath + "/" + posFaceName + ".jpg").c_str(),
             &width, &height, &nChannels, 0);
         
-        if (data == nullptr) 
+        // If unable to load, try to load .png
+        if (data == nullptr)
         {
-            LOG_ERROR("Unable to load image: " + m_folderPath + "/" + faces[i]);
-            // TODO: Clean up before leaving
-            return false;
+            data = stbi_load((m_folderPath + "/" + posFaceName + ".png").c_str(),
+                &width, &height, &nChannels, 0);
+        } 
+
+        // If can't find .png either, give up
+        if (data == nullptr)
+        {
+          continue;
         }
 
-        GLCall(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, 
-            width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data));
-        
-        free(data);
+        GLint internalFormat = nChannels == 3 ? GL_RGB : GL_RGBA;
+        GLint format = nChannels == 3 ? GL_RGB : GL_RGBA;
+        GLCall(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i++, 0, internalFormat, 
+            width, height, 0, format, GL_UNSIGNED_BYTE, data));
+
+        // Face found, don't try alternative face names
+        break;
+      }
+      if (data == nullptr)
+      {
+          std::string faceNames;
+          for (const auto& faceName : face) faceNames = faceNames + std::string(",") + faceName;
+          LOG_ERROR("Unable to load image: " + m_folderPath + "/[" + faceNames + "][.png/.jpg]");
+          // TODO: Clean up before leaving
+          return false;
+      }
+      else free(data);
     }
 
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);

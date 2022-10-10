@@ -11,7 +11,7 @@ MeshesPass::MeshesPass(int bufferWidth,
     int bufferHeight,
     const std::string& vsFilePath,
     const std::string& fsFilePath,
-    const std::vector<FramebufferAttachment> attachments,
+    const std::vector<FramebufferAttachment>& attachments,
     Scene* scene)
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
     m_vsFilePath(vsFilePath),

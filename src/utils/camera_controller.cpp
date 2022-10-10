@@ -43,12 +43,12 @@ namespace fluidity
           m_movingOnAxis.x = -1.f;
           break;
         }
-        case SDLK_LSHIFT:
+        case SDLK_e:
         {
           m_movingOnAxis.y = 1.f;
           break;
         }
-        case SDLK_LCTRL:
+        case SDLK_q:
         {
           m_movingOnAxis.y = -1.f;
           break;
@@ -81,15 +81,19 @@ namespace fluidity
           m_movingOnAxis.x = 0;
           break;
         }
-        case SDLK_LSHIFT:
+        case SDLK_e:
         {
           m_movingOnAxis.y = 0.f;
           break;
         }
-        case SDLK_LCTRL:
+        case SDLK_q:
         {
           m_movingOnAxis.y = 0.f;
           break;
+        }
+        case SDLK_r: // Reset camera position
+        {
+          m_camera.Reset();
         }
         default: break;
       }
@@ -143,7 +147,7 @@ namespace fluidity
   {
     ProcessMouse();
 
-#if true
+#if GAME_CONTROLLER_ENABLED
     if (m_gameController.IsControllerConnected())
     {
       AxisStatus axisStatus = m_gameController.GetAxisStatus();

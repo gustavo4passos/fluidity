@@ -73,10 +73,14 @@ layout(std140) uniform CameraData
 uniform int       u_HasSolid;
 uniform sampler2D u_SolidDepthMap;
 
+uniform int u_ScreenWidth;
+uniform int u_ScreenHeight;
+
 uniform samplerCube u_SkyBoxTex;
 uniform sampler2D   u_DepthTex;
 uniform sampler2D   u_ThicknessTex;
-uniform sampler2D   u_NormalTex;
+uniform sampler2D   u_FrontNormalTex;
+uniform sampler2D   u_BackNormalTex;
 uniform sampler2D   u_BackgroundTex;
 
 uniform int       u_HasShadow;
@@ -94,7 +98,8 @@ uniform int   u_TransparentFluid;
 uniform float uMinShadowBias;
 uniform float uMaxShadowBias;
 uniform float uRefractionModifier;
-uniform int uUseRefractionMask;
+uniform int   uUseRefractionMask;
+uniform int   uTwoSidedRefractions; 
 
 // in/out
 in vec2  f_TexCoord;
@@ -152,6 +157,74 @@ vec3 computeAttennuation(float thickness)
     return vec3(exp(-k_r * thickness), exp(-k_g * thickness), exp(-k_b * thickness));
 }
 
+vec3 eyeToScreen(vec3 v)
+{
+  vec4 projectedV = projectionMatrix * vec4(v, 1.0);
+  projectedV.xyz /= projectedV.w;
+  projectedV.xyz *= 0.5;
+  projectedV.xyz += 0.5;
+  return projectedV.xyz;
+}
+
+float deltaZ(vec3 Pf, vec3 Tf, float t)
+{
+  vec3 Pt = Pf + t * Tf;
+  vec3 projectedPt = eyeToScreen(Pt);
+  return Pt.z - texture(u_DepthTex, projectedPt.xy).g; 
+}
+
+bool isValidBackfacePixel(vec2 texCoord)
+{
+  vec3 value = texture(u_DepthTex, texCoord).rgb;
+  return !(value.b < 0);
+}
+
+vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
+{
+  float t0 = 0;
+  vec3 frontNormal = texture(u_FrontNormalTex, texCoord).xyz;
+  vec3 Tf = normalize(refract(-viewDir, frontNormal, 1.0 / refractiveIndex));
+  vec3 Pf = uvToEye(f_TexCoord, depth);
+
+  float ts = t0;
+  float te = (-farZ - Pf.z) / Tf.z;
+
+  while(!isValidBackfacePixel(eyeToScreen(Pf + te * Tf).xy))
+  {
+    te *= 0.5;
+  }
+
+  const float epsilon = 0.01;
+  float intersection = 0;
+
+  int i = 0;
+  // Find first valid tex
+
+  while(true)
+  {
+    float deltaZTs = deltaZ(Pf, Tf, ts);
+    float deltaZTe = deltaZ(Pf, Tf, te);
+    float tStar = ts - ((te - ts) / (deltaZTe - deltaZTs)) * deltaZTs;
+
+    if (abs(deltaZ(Pf, Tf, tStar)) < epsilon)
+    {
+      intersection = tStar;
+      break;
+    }
+
+    if (tStar < te) ts = tStar;
+    else te = tStar;
+
+    i++;
+    if (i == 40)
+    {
+        intersection = tStar;
+        break;
+    }
+  }
+
+  return Pf + intersection * Tf;
+}
 
 const int lightID = 0;
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -159,12 +232,13 @@ void main()
 {
     float eyeDepth  = texture(u_DepthTex, f_TexCoord).r;
     vec3  backColor = texture(u_BackgroundTex, f_TexCoord).xyz;
+
     if(u_HasSolid == 1) {
 #ifdef FIXED_SPOT
         //        float dx            = 1.0f / 1080.0f;
         //        float dy            = 1.0f / 1920.0f;
-        float dx            = 1.0f / 1620.0f;
-        float dy            = 1.0f / 2880.0f;
+        float dx            = 1.0f / u_ScreenWidth;
+        float dy            = 1.0f / u_ScreenHeight;
         float solidDepth_nx = texture(u_SolidDepthMap, f_TexCoord + vec2(-dx,  0)).r;
         float solidDepth_px = texture(u_SolidDepthMap, f_TexCoord + vec2( dx,  0)).r;
         float solidDepth_ny = texture(u_SolidDepthMap, f_TexCoord + vec2(  0, -dy)).r;
@@ -184,7 +258,7 @@ void main()
         }
     }
 
-    vec3  N         = texture(u_NormalTex, f_TexCoord).xyz;
+    vec3  N         = texture(u_FrontNormalTex, f_TexCoord).xyz;
     float thickness = texture(u_ThicknessTex, f_TexCoord).r;
 
     vec3 position = uvToEye(f_TexCoord, eyeDepth);
@@ -245,42 +319,74 @@ void main()
 
     //Fresnel Reflection
     float fresnelRatio    = clamp(F + (1.0 - F) * pow((1.0 - dot(viewer, N)), fresnelPower), 0, 1);
-    vec3  reflectionDir   = reflect(-viewer, N);
-    vec3  reflectionColor = texture(u_SkyBoxTex, reflectionDir).xyz;
+    // Fluidity - Shouldn't reflectionDir be in world space? This is what
+    // I'm doing here.
+    // TODO: For some reason world-space reflection is failing from some angles.
+    // I'm switching to eye-space for now until I find out why.
+    vec3 viewDirWorld = uvToSpace(f_TexCoord, eyeDepth).xyz - (camPosition).xyz;
+    vec3 frontNormal = texture(u_FrontNormalTex, f_TexCoord).xyz;
+    vec3 frontNormalWorld = normalize(mat3(transpose(viewMatrix)) * frontNormal);
+#if ENABLE_WORLD_SPACE_REFLECTION
+    // vec3 reflectionDir = reflect(viewDirWorld, frontNormalWorld);
+#endif
+    vec3 reflectionDir = reflect(-viewer, N);
+    reflectionDir = normalize(reflectionDir);
+    vec3 reflectionColor = texture(u_SkyBoxTex, reflectionDir).xyz;
 
     //Color Attenuation from Thickness (Beer's Law)
     vec3 colorAttennuation = computeAttennuation(thickness * 5.0f);
     colorAttennuation = mix(vec3(1, 1, 1), colorAttennuation, u_AttennuationConstant);
-    vec3 refractionDir = refract(-viewer, N, 1.0 / refractiveIndex);
+    vec3 refractionDir = normalize(refract(-viewer, N, 1.0 / refractiveIndex));
+    refractionDir = normalize(mat3(transpose(viewMatrix)) * refractionDir) * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
     vec2 refractionDisplacement = refractionDir.xy * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
+    vec3 refractionColor;
 
-    // GPU Gems 2 - Refraction mask
-    if (uUseRefractionMask == 1)
+    // Fluidity - Two sided refractions
+    if (uTwoSidedRefractions == 1)
     {
-        bool validDisplacement = false;
-        for (int i = 0; i < 5; i++)
-        {
-            float fluidDepthAtRefractionPoint = texture(u_DepthTex, f_TexCoord + refractionDisplacement).r;
-            float solidDepthAtRefractionPoint = texture(u_SolidDepthMap, f_TexCoord + refractionDisplacement).r;
-            if ((fluidDepthAtRefractionPoint > 0 || fluidDepthAtRefractionPoint < -1000.f) ||
-                solidDepthAtRefractionPoint >= fluidDepthAtRefractionPoint)
-            {
-                refractionDisplacement *= 0.5;
-            }
-            else
-            {
-                validDisplacement = true;
-                break;
-            }
+      vec3 intersection = findRefractionIntersection(f_TexCoord, eyeDepth, viewer);
+      vec3 projectedIntersection = eyeToScreen(intersection);
 
-            if (!validDisplacement) refractionDisplacement = vec2(0);
-        }
+      vec3 Tf = normalize(refract(-viewer, frontNormal, eta));
+      vec3 normalAtIntersection = texture(u_BackNormalTex, projectedIntersection.xy).xyz;
+      vec3 finalRefractionDir = normalize(refract(Tf, normalAtIntersection, eta));
+
+      vec3 TfWorld = refract(viewDirWorld, frontNormalWorld, eta);
+      vec3 normalAtIntersectionWorld = normalize(mat3(transpose(inverse(invViewMatrix))) * normalAtIntersection);
+      finalRefractionDir = refract(TfWorld, normalAtIntersectionWorld, refractiveIndex);
+      refractionColor = texture(u_SkyBoxTex, finalRefractionDir).xyz * colorAttennuation;
     }
+    else
+    {
 
-    vec3 refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + refractionDisplacement).xyz;
+      // Fluidity - Refraction mask
+      if (uUseRefractionMask == 1)
+      {
+          bool validDisplacement = false;
+          for (int i = 0; i < 5; i++)
+          {
+              float fluidDepthAtRefractionPoint = texture(u_DepthTex, f_TexCoord + refractionDisplacement).r;
+              float solidDepthAtRefractionPoint = texture(u_SolidDepthMap, f_TexCoord + refractionDisplacement).r;
+              if ((fluidDepthAtRefractionPoint > 0 || fluidDepthAtRefractionPoint < -1000.f) ||
+                  solidDepthAtRefractionPoint >= fluidDepthAtRefractionPoint)
+              {
+                  refractionDisplacement *= 0.5;
+              }
+              else
+              {
+                  validDisplacement = true;
+                  break;
+              }
+
+              if (!validDisplacement) refractionDisplacement = vec2(0);
+          }
+      }
+
+      refractionColor = colorAttennuation * texture(u_BackgroundTex, f_TexCoord + refractionDisplacement).xyz;
+    }
 
     fresnelRatio = mix(fresnelRatio, 1.0, u_ReflectionConstant);
     vec3 finalColor = (mix(refractionColor, reflectionColor, fresnelRatio) + specular * material.specular.xyz) * shadowColor;
-
+    
     fragColor = vec4(finalColor, 1);
 }

@@ -22,6 +22,7 @@ private:
     void LoadNewScene();
     void SaveScene();
     void SaveSceneAs();
+    void NewScene();
     void LoadFluid();
     void LoadModel();
     void LoadSkybox();
@@ -40,6 +41,8 @@ private:
     void* m_glContext;
     FluidRenderer* m_fluidRenderer;
     SceneSerializer m_sceneSerializer;
+    
+    bool m_ctrlPressed = false;
 };
 
 }
