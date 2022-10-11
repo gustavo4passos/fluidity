@@ -94,6 +94,68 @@ void GuiLayer::RenderParametersWindow()
 {
     if (ImGui::Begin("Parameters", &m_showParametersWindow))
     {
+#if FLUIDITY_ENABLE_SIMULATOR
+        static int currentlySelectedFluidType = m_fluidRenderer->m_scene.useSimulatedFluid ? 0 : 1;
+        enum FluidTypeSelection
+        {
+          FLUID_SIMULATED = 0,
+          FLUID_NPZ = 1
+        };
+
+        if (ImGui::Combo("Fluid Type", &currentlySelectedFluidType, "Simulated\0NPZ"))
+        {
+          switch(currentlySelectedFluidType)
+          {
+            case FLUID_SIMULATED:
+            {
+              if (!m_fluidRenderer->m_scene.useSimulatedFluid)
+              {
+                m_fluidRenderer->ResetPlayback();
+                m_fluidRenderer->m_scene.fluid.CleanUp();
+                m_fluidRenderer->m_ps.Reset();
+              }
+              m_fluidRenderer->m_scene.useSimulatedFluid = true;
+              break;
+            }
+            case FLUID_NPZ:
+            {
+              if (m_fluidRenderer->m_scene.useSimulatedFluid)
+              {
+                m_fluidRenderer->m_scene.fluid.CleanUp();
+                m_fluidRenderer->ResetPlayback();
+              }
+              m_fluidRenderer->m_scene.useSimulatedFluid = false;
+              break;
+            }
+            default: break;
+          }
+        }
+        if (m_fluidRenderer->m_scene.useSimulatedFluid)
+        {
+          if (ImGui::CollapsingHeader("Simulation"))
+          {
+            auto& ps = m_fluidRenderer->m_ps;
+            auto& sp = m_fluidRenderer->m_scene.fluidSimulationParameters;
+            ImGui::DragInt("Iterations", &sp.m_iterations, 1, 1, 100);
+            ImGui::DragFloat("Damping", &sp.m_damping, 0.001f, 0.f, 1.f);
+            ImGui::DragFloat("Gravity", &sp.m_gravity, 0.0001f, 0.f, 0.005f);
+            ImGui::DragFloat("Time Step", &sp.m_timestep, 0.001, 0.001, 1.f);
+            ImGui::DragFloat("Collide Spring", &sp.m_collideSpring, 0.001f, 0.f, 1.f);
+            ImGui::DragFloat("Collide Damping", &sp.m_collideDamping, 0.001f, 0.f, 0.1f);
+            ImGui::DragFloat("Collide Shear", &sp.m_collideShear, 0.001f, 0.f, 0.1f);
+            ImGui::DragFloat("Collide Attraction", &sp.m_collideAttraction, 0.001f, 0.f, 0.1f);
+
+            float3 colliderPos = ps.GetParticleSystem()->getColliderPos();
+            ImGui::DragFloat3("Collider Position", (float*)(&colliderPos), 0.01f, -100.f, 100.f);
+            ps.GetParticleSystem()->setColliderPos(colliderPos);
+
+            if (ImGui::Button("Reset"))
+            {
+              ps.GetParticleSystem()->reset(ParticleSystem::CONFIG_GRID);
+            }
+          }
+        }
+#endif
         if (ImGui::CollapsingHeader("Lighting"))
         {
             auto& lightingParameters = m_fluidRenderer->m_scene.lightingParameters;
@@ -285,8 +347,15 @@ void GuiLayer::RenderPerformanceOverlay()
         ImGui::Separator();
         ImGui::Text("%.1f FPS", io.Framerate);
         ImGui::Text("%.3f ms/frame", 1000.f / io.Framerate);
-        ImGui::Text("%d particles", m_fluidRenderer->m_scene.fluid.
-            GetNumberOfParticles(m_fluidRenderer->GetCurrentFrame()));
+        int nParticles = m_fluidRenderer->m_scene.fluid.
+            GetNumberOfParticles(m_fluidRenderer->GetCurrentFrame());
+#if FLUIDITY_ENABLE_SIMULATOR
+        if (m_fluidRenderer->m_scene.useSimulatedFluid) 
+        {
+          nParticles = m_fluidRenderer->m_ps.GetNumberOfParticles();
+        }
+#endif
+        ImGui::Text("%d particles", nParticles); 
 
         if (ImGui::BeginPopupContextWindow())
         {

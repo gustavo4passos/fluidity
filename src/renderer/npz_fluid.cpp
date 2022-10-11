@@ -1,4 +1,4 @@
-#include "Fluid.hpp"
+#include "npz_fluid.hpp"
 #include "utils/glcall.h"
 #include <sstream>
 #include <iomanip>
@@ -113,4 +113,3 @@ int Fluid::CalcNumberOfParticles(const cnpy::NpyArray& particleData)
     const int COMPONENT_SIZE = particleData.word_size; // Bytes
     return particleData.num_bytes() / NUM_COMPONENTS / COMPONENT_SIZE;
 }
- 

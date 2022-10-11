@@ -1,5 +1,4 @@
 #pragma once
-
 #include "renderer/particle_render_pass.hpp"
 #include "renderer/particle_render_pass.hpp"
 #include "renderer/particle_pass.hpp"
@@ -10,6 +9,7 @@
 #include "renderer/scene.hpp"
 #include "utils/export_directives.h"
 #include "utils/camera_controller.hpp"
+#include "simulation/simulated_fluid.hpp"
 #include <unordered_map>
 
 namespace fluidity
@@ -85,6 +85,7 @@ private:
   static constexpr int NUM_TOTAL_LIGHTS = 8;
   Scene m_scene;
   Model m_lightModel;
+  Model m_colliderModel;
 
   unsigned m_windowWidth;
   unsigned m_windowHeight;
@@ -92,6 +93,10 @@ private:
   unsigned m_currentFrame = 0;
   bool m_playing = false;
   float m_aspectRatio;
+
+#if FLUIDITY_ENABLE_SIMULATOR
+  SimulatedFluid m_ps;
+#endif
 };
 
 }

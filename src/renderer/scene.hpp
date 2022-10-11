@@ -2,15 +2,16 @@
 #include "renderer/model.hpp"
 #include "renderer/skybox.hpp"
 #include "renderer/rendering_parameters.hpp"
+#include "renderer/npz_fluid.hpp"
+#include "simulation/simulated_fluid.hpp"
 #include "utils/camera.hpp"
-#include "Fluid.hpp"
-#include "vec.hpp"
 #include <vector>
 #include <string>
 #include <yaml-cpp/yaml.h>
 
 namespace fluidity
 {
+
 struct Scene
 {
     Fluid fluid;
@@ -23,6 +24,8 @@ struct Scene
     std::vector<Model> models;
     std::string skyboxPath;
     Vec4 clearColor; 
+    bool useSimulatedFluid = false;
+    FluidSimulationParameters fluidSimulationParameters;
 
     static Scene CreateEmptyScene() 
     {
@@ -63,7 +66,7 @@ public:
     const std::string& GetFilePath() const { return m_filePath; }
     void SetFilePath(const std::string filePath) { m_filePath = filePath; }
 
-    static constexpr char* SERIALIZER_VERSION = "1.0";
+    static constexpr char* SERIALIZER_VERSION = "1.1";
     static constexpr char* SCENE_FILE_EXTENSION = ".yml";
 
 private:
@@ -71,9 +74,10 @@ private:
     std::string m_filePath;
 
     void SerializeModel(YAML::Emitter& out, const Model& m);
-    void SerializeFluid(YAML::Emitter& out, const Fluid& f);
+    void SerializeNPZFluid(YAML::Emitter& out, const Fluid& f);
+    void SerializeSimulatedFluid(YAML::Emitter& out, const FluidSimulationParameters& p);
 
-    bool DeserializeFluid(const YAML::Node& node, Fluid& f);
+    bool DeserializeNPZFluid(const YAML::Node& node, Fluid& f);
     bool DeserializeModel(const YAML::Node& node, Model& m);
 
     std::string GetRelativePathFromSceneFile(const std::string& path);

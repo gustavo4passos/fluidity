@@ -13,3 +13,6 @@
 [submodule "external/cnpy"]
 	path = external/cnpy
 	url = https://github.com/gustavo4passos/cnpy
+[submodule "external/cuda-fluid-simulator"]
+	path = external/cuda-fluid-simulator
+	url = https://github.com/gustavo4passos/cuda-fluid-simulator

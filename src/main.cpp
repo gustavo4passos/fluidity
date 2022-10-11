@@ -1,7 +1,6 @@
 #include <iostream>
 #include <stdio.h>
 #include <cnpy.h>
-#include "Fluid.hpp"
 #include "renderer/fluid_renderer.hpp"
 #include "renderer/window.h"
 #include "utils/logger.h"

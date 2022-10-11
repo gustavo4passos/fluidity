@@ -184,6 +184,27 @@ struct YAML::convert<fluidity::Camera>
     }
 };
 
+template<>
+struct YAML::convert<FluidSimulationParameters>
+{
+    static bool decode(const YAML::Node& node, FluidSimulationParameters& p)
+    {
+        if (!node.IsMap()) return false;
+
+        p.m_iterations        = node["iterations"].as<int>();
+        p.m_damping           = node["damping"].as<float>();
+        p.m_gravity           = node["gravity"].as<float>();
+        p.m_ballRadius        = node["ballRadius"].as<float>();
+        p.m_collideDamping    = node["collideDamping"].as<float>();
+        p.m_collideSpring     = node["collideSpring"].as<float>();
+        p.m_collideShear      = node["collideShear"].as<float>();
+        p.m_collideAttraction = node["collideAttraction"].as<float>();
+        p.m_timestep          = node["timestep"].as<float>();
+
+        return true;
+    }
+};
+
 namespace fluidity
 {
 YAML::Emitter& operator << (YAML::Emitter& out, const FilteringParameters& filteringParameters)
@@ -300,6 +321,23 @@ YAML::Emitter& operator << (YAML::Emitter& out, const Camera& camera)
     return out;
 }
 
+YAML::Emitter& operator << (YAML::Emitter& out, const FluidSimulationParameters& p)
+{
+    using namespace YAML;
+    out << BeginMap;
+      out << Key << "iterations"        << Value << p.m_iterations;
+      out << Key << "damping"           << Value << p.m_damping;
+      out << Key << "gravity"           << Value << p.m_gravity;
+      out << Key << "ballRadius"        << Value << p.m_ballRadius;
+      out << Key << "collideDamping"    << Value << p.m_collideDamping;
+      out << Key << "collideSpring"     << Value << p.m_collideSpring;
+      out << Key << "collideShear"      << Value << p.m_collideShear;
+      out << Key << "collideAttraction" << Value << p.m_collideAttraction;
+      out << Key << "timestep"          << Value << p.m_timestep;
+    out << EndMap;
+    return out;
+}
+
 SceneSerializer::SceneSerializer(const std::string& filePath)
     : m_filePath(filePath)
 { /* */ }
@@ -338,7 +376,14 @@ void SceneSerializer::Serialize()
         out << EndSeq;
         out << Key << "Camera" << m_scene.camera;
         out << Key << "Skybox" << Value << GetRelativePathFromSceneFile(m_scene.skyboxPath);
-        SerializeFluid(out, m_scene.fluid);
+        if (m_scene.useSimulatedFluid)
+        {
+          SerializeSimulatedFluid(out, m_scene.fluidSimulationParameters);
+        }
+        else
+        {
+          SerializeNPZFluid(out, m_scene.fluid);
+        }
 
     out << EndMap;
 
@@ -426,17 +471,28 @@ bool SceneSerializer::Deserialize()
 
     if (root["Fluid"])
     {
-        if (!DeserializeFluid(root["Fluid"], sc.fluid))
+      auto& fluidRoot = root["Fluid"];
+      if (fluidRoot["type"].as<std::string>() == "npz")
+      {
+        if (!DeserializeNPZFluid(root["Fluid"], sc.fluid))
         {
             LOG_ERROR(m_filePath + ": Unable to load fluid.");
         }
+        sc.useSimulatedFluid = false;
+      }
+#if FLUIDITY_ENABLE_SIMULATOR
+      else
+      {
+        sc.fluidSimulationParameters = fluidRoot["fluidSimulationParameters"].as<FluidSimulationParameters>();
+        sc.useSimulatedFluid = true;
+      }
+#endif
 
     }
     // TODO: Unecessary copy
     m_scene = sc;
     return true;
 }
-
 
 void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
 {
@@ -452,7 +508,7 @@ void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
     out << EndMap;
 }
 
-void SceneSerializer::SerializeFluid(YAML::Emitter& out, const Fluid& f)
+void SceneSerializer::SerializeNPZFluid(YAML::Emitter& out, const Fluid& f)
 {
     using namespace YAML;
     out << Key << "Fluid";
@@ -467,7 +523,18 @@ void SceneSerializer::SerializeFluid(YAML::Emitter& out, const Fluid& f)
     out << EndSeq << EndMap;
 }
 
-bool SceneSerializer::DeserializeFluid(const YAML::Node& node, Fluid& f)
+void SceneSerializer::SerializeSimulatedFluid(YAML::Emitter& out, 
+    const FluidSimulationParameters& p)
+{
+  using namespace YAML;
+  out << Key << "Fluid";
+  out << BeginMap;
+  out << Key << "type" << Value << "simulated";
+  out << Key << "fluidSimulationParameters" << Value << p;
+  out << EndMap;
+}
+
+bool SceneSerializer::DeserializeNPZFluid(const YAML::Node& node, Fluid& f)
 {
     if (!node.IsMap()) return false;
     if (!node["fileList"] || !node["fileList"].IsSequence()) return false;

@@ -27,7 +27,8 @@ FluidRenderer::FluidRenderer(unsigned windowWidth, unsigned windowHeight, float 
   m_aspectRatio((float) windowWidth / windowHeight),
   m_cameraController(Camera({ 17.f, 8.f, 0.5f }, 45.f)),
   m_currentFrame(0),
-  m_lightModel("../../assets/cube.obj")
+  m_lightModel("../../assets/cube.obj"),
+  m_colliderModel("../../assets/sphere.obj")
   { /* */ }
 
 auto FluidRenderer::Init() -> bool 
@@ -234,6 +235,14 @@ auto FluidRenderer::Init() -> bool
   if (!LoadScene()) return false;
   if (!InitUniformBuffers()) return false;
 
+  // Load collider model
+  m_colliderModel.Load();
+  m_colliderModel.GetMaterial().diffuse = { 1.f, 1.f, 1.f };
+
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid && !m_ps.Init()) return false;
+#endif
+
   return true;
 }
 
@@ -252,7 +261,6 @@ bool FluidRenderer::LoadScene()
 {
   // Sanity check: Guarantes the fluid renderer has been init
   assert(m_meshesPass != nullptr);
-
   m_meshesPass->RemoveSkybox();
   
   if (m_scene.skyboxPath != "")
@@ -266,7 +274,6 @@ bool FluidRenderer::LoadScene()
     else
     {
       LOG_ERROR("Unable to load skybox " + m_scene.skyboxPath);
-      return false;
     }
   }
 
@@ -289,6 +296,20 @@ bool FluidRenderer::LoadScene()
   ResetPlayback();
   Play();
 
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid)
+  {
+    // if LoadScene has been called before Init, the particle system won't 
+    // have been inited.
+    if (!m_ps.HasBenInit()) m_ps.Init();
+    m_ps.Reset();
+    m_ps.m_simulationParameters = m_scene.fluidSimulationParameters;
+    float colliderScale = m_ps.GetParticleSystem()->getColliderRadius();
+    m_colliderModel.SetScale({ colliderScale, colliderScale, colliderScale });
+    float3 colliderPos = m_ps.GetParticleSystem()->getColliderPos();
+    m_colliderModel.SetTranslation({ colliderPos.x, colliderPos.y, colliderPos.z });
+  }
+#endif
   return true;
 }
 
@@ -310,23 +331,57 @@ void FluidRenderer::SetCurrentFrame(int frame)
 
 auto FluidRenderer::SetVAOS() -> void
 {
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (!m_scene.useSimulatedFluid) assert(m_scene.fluid.GetNumberOfFrames() > 0);
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    if (m_scene.useSimulatedFluid) renderPassPair.second->SetVAO(m_ps.GetFrameVao());
+    else renderPassPair.second->SetVAO(m_scene.fluid.GetFrameVao(m_currentFrame));
+  }
+#else
   assert(m_scene.fluid.GetNumberOfFrames() > 0);
   for (auto& renderPassPair : m_renderPasses)
   {
     renderPassPair.second->SetVAO(m_scene.fluid.GetFrameVao(m_currentFrame));
   }
+#endif
 }
 
 auto FluidRenderer::SetNumberOfParticles() -> void
 {
+#if FLUIDITY_ENABLE_SIMULATOR
+  for (auto& renderPassPair : m_renderPasses)
+  {
+    if (m_scene.useSimulatedFluid) renderPassPair.second->SetNumVertices(m_ps.GetNumberOfParticles());
+    else renderPassPair.second->SetNumVertices(m_scene.fluid.GetNumberOfParticles(m_currentFrame));
+  }
+#else
   for (auto& renderPassPair : m_renderPasses)
   {
     renderPassPair.second->SetNumVertices(m_scene.fluid.GetNumberOfParticles(m_currentFrame));
   }
+#endif
 }
 
 auto FluidRenderer::ProcessInput(const SDL_Event& e) -> void 
 {
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid)
+  {
+    if (e.type == SDL_KEYUP)
+    {
+      if (e.key.keysym.sym == SDLK_c)
+      {
+        m_ps.GetParticleSystem()->reset(ParticleSystem::CONFIG_RANDOM);
+      }
+      if (e.key.keysym.sym == SDLK_v)
+      {
+        m_ps.AddSphere();
+      }
+    }
+  }
+#endif
+
   m_cameraController.ProcessInput(e);
 }
 
@@ -597,14 +652,31 @@ void FluidRenderer::SetUpPerFrameUniforms()
 auto FluidRenderer::Update() -> void
 {
   m_cameraController.Update();
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (IsPlaying())
+  {
+    if (m_scene.useSimulatedFluid) m_ps.Update();
+    else AdvanceFrame();
+  }
+#else
   if (IsPlaying()) AdvanceFrame();
+#endif
 }
 
 auto FluidRenderer::Render() -> void
 {
   SetUpPerFrameUniforms(); 
+#if FLUIDITY_ENABLE_SIMULATOR
+  m_ps.m_simulationParameters = m_scene.fluidSimulationParameters;
+#endif
+
   GLuint depthTexture = 0;
+
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid || m_scene.fluid.GetNumberOfFrames() > 0)
+#else
   if (m_scene.fluid.GetNumberOfFrames() > 0)
+#endif
   {
     SetVAOS();
     SetNumberOfParticles();
@@ -707,6 +779,15 @@ auto FluidRenderer::UploadLights() -> void
 
 void FluidRenderer::RenderMeshes()
 {
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid)
+  {
+    float3 colliderPos = m_ps.GetParticleSystem()->getColliderPos();
+    m_colliderModel.SetTranslation({ colliderPos.x, colliderPos.y, colliderPos.z });
+    m_scene.models.push_back(m_colliderModel);
+  }
+#endif
+
     if (m_scene.lightingParameters.renderShadows)
     {
       m_meshesShadowPass->Render();
@@ -735,6 +816,10 @@ void FluidRenderer::RenderMeshes()
 
     // Remove light model from scene so it does not affect other passes
     if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
+  
+#if FLUIDITY_ENABLE_SIMULATOR
+  if (m_scene.useSimulatedFluid) m_scene.models.pop_back();
+#endif
 }
 
 void FluidRenderer::DoFiltering()
@@ -776,5 +861,4 @@ void FluidRenderer::DoFiltering()
       }
     }
 }
-
 }
