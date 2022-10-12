@@ -240,7 +240,7 @@ auto FluidRenderer::Init() -> bool
   m_colliderModel.GetMaterial().diffuse = { 1.f, 1.f, 1.f };
 
 #if FLUIDITY_ENABLE_SIMULATOR
-  if (m_scene.useSimulatedFluid && !m_ps.Init()) return false;
+  if (m_scene.useSimulatedFluid && !InitParticleSystem()) return false;
 #endif
 
   return true;
@@ -253,7 +253,6 @@ void FluidRenderer::SetScene(const Scene& scene)
     model.CleanUp();
   }
   m_scene.fluid.CleanUp();
-
   m_scene = scene;
 }
 
@@ -301,13 +300,9 @@ bool FluidRenderer::LoadScene()
   {
     // if LoadScene has been called before Init, the particle system won't 
     // have been inited.
-    if (!m_ps.HasBenInit()) m_ps.Init();
+    if (!InitParticleSystem()) return false;
     m_ps.Reset();
     m_ps.m_simulationParameters = m_scene.fluidSimulationParameters;
-    float colliderScale = m_ps.GetParticleSystem()->getColliderRadius();
-    m_colliderModel.SetScale({ colliderScale, colliderScale, colliderScale });
-    float3 colliderPos = m_ps.GetParticleSystem()->getColliderPos();
-    m_colliderModel.SetTranslation({ colliderPos.x, colliderPos.y, colliderPos.z });
   }
 #endif
   return true;
@@ -861,4 +856,46 @@ void FluidRenderer::DoFiltering()
       }
     }
 }
+
+// Particle system related methods
+#if FLUIDITY_ENABLE_SIMULATOR
+void FluidRenderer::SetFluidType(FluidType type)
+{
+  if (type == FluidType::SPHSimulation)
+  {
+    if (!m_scene.useSimulatedFluid)
+    {
+      m_scene.useSimulatedFluid = true;
+      ResetPlayback();
+      m_scene.fluid.CleanUp();
+
+      InitParticleSystem();
+      m_ps.Reset();
+    }
+  }
+  else 
+  {
+    if (m_scene.useSimulatedFluid)
+    {
+      m_scene.useSimulatedFluid = false;
+      m_scene.fluid.CleanUp();
+      ResetPlayback();
+    }
+  }
 }
+
+bool FluidRenderer::InitParticleSystem()
+{
+    if (m_ps.HasBenInit()) return true;
+
+    if (!m_ps.Init()) return false;
+    float colliderScale = m_ps.GetParticleSystem()->getColliderRadius();
+    m_colliderModel.SetScale({ colliderScale, colliderScale, colliderScale });
+    float3 colliderPos = m_ps.GetParticleSystem()->getColliderPos();
+    m_colliderModel.SetTranslation({ colliderPos.x, colliderPos.y, colliderPos.z });
+
+    return true;
+}
+#endif
+}
+

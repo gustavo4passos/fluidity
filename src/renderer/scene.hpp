@@ -48,6 +48,15 @@ struct Scene
         };
     }
     
+    void AddPlane(const vec3& translation = { 0.f, 0.f, 0.f }, 
+        float scale = 1.f)
+    {
+      Model m;
+      m.AddPlane();
+      m.SetScale({ scale, scale, scale });
+      m.SetTranslation(translation);
+      models.push_back(m);
+    }
 };
 
 

@@ -95,7 +95,11 @@ private:
   float m_aspectRatio;
 
 #if FLUIDITY_ENABLE_SIMULATOR
+public:
+  void SetFluidType(FluidType type);
+private:
   SimulatedFluid m_ps;
+  bool InitParticleSystem();
 #endif
 };
 

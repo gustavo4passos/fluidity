@@ -20,8 +20,8 @@ bool GuiLayer::Init()
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     ImGui::StyleColorsDark();
 
@@ -84,7 +84,13 @@ void GuiLayer::Render()
 
     if (m_showPerformanceOverlay) RenderPerformanceOverlay();
     if (m_showParametersWindow) RenderParametersWindow();    
+
+#if FLUIDITY_ENABLE_SIMULATOR
+    // Playback bar does not make sense when using simulated fluid
+    if (!m_fluidRenderer->m_scene.useSimulatedFluid) RenderPlaybackBar();
+#else
     RenderPlaybackBar();
+#endif
     
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -108,23 +114,12 @@ void GuiLayer::RenderParametersWindow()
           {
             case FLUID_SIMULATED:
             {
-              if (!m_fluidRenderer->m_scene.useSimulatedFluid)
-              {
-                m_fluidRenderer->ResetPlayback();
-                m_fluidRenderer->m_scene.fluid.CleanUp();
-                m_fluidRenderer->m_ps.Reset();
-              }
-              m_fluidRenderer->m_scene.useSimulatedFluid = true;
+              m_fluidRenderer->SetFluidType(FluidType::SPHSimulation);
               break;
             }
             case FLUID_NPZ:
             {
-              if (m_fluidRenderer->m_scene.useSimulatedFluid)
-              {
-                m_fluidRenderer->m_scene.fluid.CleanUp();
-                m_fluidRenderer->ResetPlayback();
-              }
-              m_fluidRenderer->m_scene.useSimulatedFluid = false;
+              m_fluidRenderer->SetFluidType(FluidType::NPZPreSimulated);
               break;
             }
             default: break;
@@ -292,6 +287,11 @@ void GuiLayer::RenderParametersWindow()
             if (ImGui::Button("Load Model"))
             {
                 LoadModel();
+            }
+
+            if (ImGui::Button("Add plane"))
+            {
+              scene.AddPlane(); 
             }
         }
 
@@ -481,6 +481,11 @@ void GuiLayer::RenderMainMenuBar()
             if (ImGui::MenuItem("Load Model"))
             {
                LoadModel();
+            }
+
+            if (ImGui::MenuItem("Add Plane"))
+            {
+              m_fluidRenderer->m_scene.AddPlane();
             }
 
             ImGui::EndMenu();

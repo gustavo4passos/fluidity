@@ -6,7 +6,7 @@ class Model
 {
 public:
     Model(const std::string& filePath, bool genSmoothNormals = false);
-    Model() = default;
+    Model();
     bool Load();
     void CleanUp();
 
@@ -34,6 +34,8 @@ public:
     
     const vec3& GetScale() const { return m_scale; }
     void SetScale(const vec3& scale) { m_scale = scale; }
+
+    void AddPlane();
 
 private:
     Material m_material;

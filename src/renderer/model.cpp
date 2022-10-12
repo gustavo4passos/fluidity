@@ -18,6 +18,19 @@ Model::Model(const std::string& filePath, bool genSmoothNormals)
         }
 { /* */ }
 
+Model::Model()
+    : m_filePath(""),
+    m_genSmoothNormals(false),
+    m_material { 
+        { 0.1f, 0.1f, 0.1f },
+        { 0.4f, 0.4f, 0.4f },
+        { 1.f,  1.f,  1.f },
+        32.f,
+        false,
+        0.f
+    }
+{ /* */ }
+
 bool Model::Load()
 {
     Assimp::Importer importer;
@@ -87,4 +100,20 @@ void Model::CleanUp()
     }
 
     m_meshes.clear();
+}
+
+void Model::AddPlane()
+{
+  std::vector<Vertex> vertices = {
+    { { -0.5f, 0.f, -0.5f }, { 0.0, 1.f, 0.0 } },
+    { {  0.5f, 0.f, -0.5f }, { 0.0, 1.f, 0.0 } },
+    { {  0.5f, 0.f,  0.5f }, { 0.0, 1.f, 0.0 } },
+    { { -0.5f, 0.f,  0.5f }, { 0.0, 1.f, 0.0 } }
+  };                   
+
+  std::vector<unsigned> indices = { 0, 1, 2, 0, 2, 3 };
+
+  Mesh m(vertices, indices);
+  m.Init();
+  m_meshes.push_back(m);
 }
