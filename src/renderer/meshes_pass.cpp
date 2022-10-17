@@ -54,8 +54,9 @@ void MeshesPass::Render()
 
     // TODO: The per-model uniforms and context changes are acceptable here only because
     // the number of models is admitted to be short
-    for (auto& model : m_scene->models)
+    for (auto& modelPair : m_scene->models)
     {
+        auto& model = modelPair.second;
         if (!model.IsVisible()) continue;
 
         if (model.GetHideFrontFaces()) 
@@ -79,16 +80,7 @@ void MeshesPass::Render()
         m_shader->SetUniform1i("uEmissive", material.emissive ? 1 : 0, true);
         m_shader->SetUniform1f("uReflectiveness", material.reflectiveness, true);
 
-        vec3 modelTranslation = model.GetTranslation();
-        vec3 modelScale       = model.GetScale();
-
-        glm::mat4 modelMatrix = modelMatrix = glm::translate(glm::mat4(1.f), glm::vec3(modelTranslation.x,
-            modelTranslation.y, modelTranslation.z));
-        modelMatrix = glm::scale(modelMatrix, glm::vec3(modelScale.x, 
-            modelScale.y, modelScale.z));
-        
-
-        m_shader->SetUniformMat4("model", glm::value_ptr(modelMatrix), true);
+        m_shader->SetUniformMat4("model", glm::value_ptr(model.GetModelMatrix()), true);
 
         for (auto& mesh : model.GetMeshes())
         {

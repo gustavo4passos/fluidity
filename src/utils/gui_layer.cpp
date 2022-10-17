@@ -160,7 +160,7 @@ void GuiLayer::RenderParametersWindow()
             // TODO: The ## light identifier is used to avoid id conflicts on imgui, since it will create a hash
             // using the name of the window and the ## identifier.
             // However, it won't work when multiple lights are at play
-            ImGui::DragFloat3("Position##light", (float*)&light.position, 0.5, -100.f, 100.f);
+            ImGui::DragFloat3("Position##light", (float*)&light.position, 0.05, -100.f, 100.f);
             ImGui::ColorEdit3("Diffuse##light", (float*)&light.diffuse);
             ImGui::ColorEdit3("Ambient##light", (float*)&light.ambient);
             ImGui::ColorEdit3("Specular##light", (float*)&light.specular);
@@ -192,8 +192,9 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
             ImGui::DragFloat("Reflection Constant", (float*)&fluidParameters.reflectionConstant, 0.005f, 0.f, 1.f);
-            ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0005, 0.0001);
+            ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0001, 0.0001, 1.f);
             ImGui::DragFloat("Refraction Modifier", (float*)&fluidParameters.refractionModifier, 0.0005, 0.0001, 5, "%.4f");
+            ImGui::DragFloat("Refractive Index", (float*)&fluidParameters.refractiveIndex, 0.005f, -1.f, 1.f);
 
             ImGui::Separator();
             ImGui::Text("Material");
@@ -211,8 +212,9 @@ void GuiLayer::RenderParametersWindow()
             ImGui::Checkbox("1D Filter", &filteringParameters.filter1D);
 
             ImGui::Separator();
-            ImGui::Checkbox("Gamma Correction", &filteringParameters.gammaCorrection);
-            ImGui::Checkbox("Use Refactinon Mask", &filteringParameters.useRefractionMask);
+            // TODO: Gama correction is unusable for now
+            // ImGui::Checkbox("Gamma Correction", &filteringParameters.gammaCorrection);
+            ImGui::Checkbox("Use Refaction Mask", &filteringParameters.useRefractionMask);
         }
 
         if (ImGui::CollapsingHeader("Environment"))
@@ -238,9 +240,12 @@ void GuiLayer::RenderParametersWindow()
             ImGui::Text("Models");
             // Used to avoid id conflicts on imgui
             int modelIdHash = 0;
-            for (auto& model : m_fluidRenderer->m_scene.models)
+            for (auto& modelPair : m_fluidRenderer->m_scene.models)
             {
+                auto& model = modelPair.second;
+
                 ImGui::Spacing();
+                ImGui::Text((std::string("ID: ") + std::to_string(modelPair.first)).c_str());
                 ImGui::Text(model.GetFilePath().c_str());
                 bool hasSmoothedNormals = model.HasSmoothNormals();
                 ImGui::PushID(modelIdHash++);
@@ -266,10 +271,15 @@ void GuiLayer::RenderParametersWindow()
                 ImGui::DragFloat3("Translation", (float*)&translation, 0.05, -4000, 4000);
                 model.SetTranslation(translation);
 
+                vec3 rotation = model.GetRotation();
+                rotation = { glm::degrees(rotation.x), glm::degrees(rotation.y), glm::degrees(rotation.z) };
+                ImGui::DragFloat3("Rotation", (float*)&rotation, 0.1, -360, 360);
+                rotation = { glm::radians(rotation.x), glm::radians(rotation.y), glm::radians(rotation.z) };
+                model.SetRotation(rotation);
+
                 vec3 scale = model.GetScale();
-                float scale1f = scale.x;
-                ImGui::DragFloat("Scale", &scale1f, 0.05, 0.05, 300);
-                model.SetScale({ scale1f, scale1f, scale1f });
+                ImGui::DragFloat3("Scale", (float*)&scale, 0.05, 0.05, 300);
+                model.SetScale(scale);
 
                 ImGui::Spacing();
                 auto& material = model.GetMaterial();
@@ -606,7 +616,7 @@ void GuiLayer::LoadModel()
         Model m = Model(modelPath);
         if (m.Load())
         {
-            m_fluidRenderer->m_scene.models.push_back(m);
+            m_fluidRenderer->m_scene.AddModel(m);
         }
     }
 }

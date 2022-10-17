@@ -250,7 +250,7 @@ void FluidRenderer::SetScene(const Scene& scene)
 {
   for (auto& model : m_scene.models)
   {
-    model.CleanUp();
+    model.second.CleanUp();
   }
   m_scene.fluid.CleanUp();
   m_scene = scene;
@@ -569,15 +569,8 @@ void FluidRenderer::SetUpPerFrameUniforms()
   for (int i = 0; i < m_scene.lights.size(); i++)
   {
     auto& l = m_scene.lights[i];
-    float radius = 10.f;
-    glm::mat4 lightProjection = glm::ortho(-radius, radius, -radius, radius, zNear, zFar);
-    // Find light matrix
-    glm::mat4 lightView = glm::lookAt(glm::vec3(l.position.x, l.position.y, l.position.z),
-      glm::vec3(0), // directional light, pointing at scene origin
-      glm::vec3(0, 1.0, 0));
-
-    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Mat4), glm::value_ptr(lightView)));
-    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Mat4), sizeof(Mat4), glm::value_ptr(lightProjection)));
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Mat4), glm::value_ptr(l.GetViewMatrix())));
+    GLCall(glBufferSubData(GL_UNIFORM_BUFFER, sizeof(Mat4), sizeof(Mat4), glm::value_ptr(l.GetProjectionMatrix())));
   }
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, 0));
 
@@ -609,6 +602,7 @@ void FluidRenderer::SetUpPerFrameUniforms()
   compositionPassShader.SetUniform1f("uRefractionModifier", fluidParameters.refractionModifier);
   compositionPassShader.SetUniform1i("uUseRefractionMask", filteringParameters.useRefractionMask ? 1 : 0);
   compositionPassShader.SetUniform1f("u_ReflectionConstant", fluidParameters.reflectionConstant);
+  compositionPassShader.SetUniform1f("uRefractiveIndex", fluidParameters.refractiveIndex);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
@@ -661,18 +655,18 @@ auto FluidRenderer::Update() -> void
 auto FluidRenderer::Render() -> void
 {
   SetUpPerFrameUniforms(); 
-#if FLUIDITY_ENABLE_SIMULATOR
-  m_ps.m_simulationParameters = m_scene.fluidSimulationParameters;
-#endif
+  SetUpPlanes();
 
   GLuint depthTexture = 0;
 
 #if FLUIDITY_ENABLE_SIMULATOR
   if (m_scene.useSimulatedFluid || m_scene.fluid.GetNumberOfFrames() > 0)
+  {
+    m_ps.m_simulationParameters = m_scene.fluidSimulationParameters;
 #else
   if (m_scene.fluid.GetNumberOfFrames() > 0)
-#endif
   {
+#endif
     SetVAOS();
     SetNumberOfParticles();
 
@@ -732,7 +726,7 @@ auto FluidRenderer::UploadCameraData() -> void
 {
   GLCall(glBindBuffer(GL_UNIFORM_BUFFER, m_uniformBufferCameraData));
 
-  auto view = m_cameraController.GetCamera().GetViewMatrix();
+  auto view       = m_cameraController.GetCamera().GetViewMatrix();
   auto projection = m_cameraController.GetCamera().GetProjectionMatrix();
   glm::vec3 position = m_cameraController.GetCamera().GetPosition();
   glm::vec4 positionV4 = glm::vec4(position, 1.0);
@@ -775,11 +769,12 @@ auto FluidRenderer::UploadLights() -> void
 void FluidRenderer::RenderMeshes()
 {
 #if FLUIDITY_ENABLE_SIMULATOR
+  int colliderModelId;
   if (m_scene.useSimulatedFluid)
   {
     float3 colliderPos = m_ps.GetParticleSystem()->getColliderPos();
     m_colliderModel.SetTranslation({ colliderPos.x, colliderPos.y, colliderPos.z });
-    m_scene.models.push_back(m_colliderModel);
+    colliderModelId = m_scene.AddModel(m_colliderModel, -100);
   }
 #endif
 
@@ -789,6 +784,7 @@ void FluidRenderer::RenderMeshes()
       m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
     }
     // Places light model in the scene
+    int lightModelId;
     if (m_scene.lightingParameters.showLightsOnScene)
     {
       // Positions light model in the same position as the light, and set color accordingly
@@ -796,7 +792,7 @@ void FluidRenderer::RenderMeshes()
       auto lightColor = m_scene.lights[0].diffuse;
       m_lightModel.SetTranslation({ lightPos.x, lightPos.y, lightPos.z });
       m_lightModel.GetMaterial().diffuse = { lightColor.x, lightColor.y, lightColor.z };
-      m_scene.models.push_back(m_lightModel);
+      lightModelId = m_scene.AddModel(m_lightModel, -200);
     }
 
     if (m_meshesPass->HasSkybox()) m_meshesPass->SetInputTexture({ m_meshesPass->GetSkybox()
@@ -810,10 +806,10 @@ void FluidRenderer::RenderMeshes()
     m_meshesPass->Render();
 
     // Remove light model from scene so it does not affect other passes
-    if (m_scene.lightingParameters.showLightsOnScene) m_scene.models.pop_back();
+    if (m_scene.lightingParameters.showLightsOnScene) m_scene.RemoveModel(lightModelId);
   
 #if FLUIDITY_ENABLE_SIMULATOR
-  if (m_scene.useSimulatedFluid) m_scene.models.pop_back();
+  if (m_scene.useSimulatedFluid) m_scene.RemoveModel(colliderModelId);
 #endif
 }
 
@@ -857,6 +853,74 @@ void FluidRenderer::DoFiltering()
     }
 }
 
+void FluidRenderer::SetUpPlanes()
+{
+  ComputePlanesParameters();
+}
+
+void FluidRenderer::ComputePlanesParameters()
+{
+  auto& compositionShader = m_compositionPass->GetShader();
+  compositionShader.Bind();
+  auto viewMatrix = m_cameraController.GetCamera().GetViewMatrix();
+
+  int i = 0;
+  for (auto pi : m_scene.planes)
+  {
+    // Non visible planes will be ignored
+    auto& plane = m_scene.models[pi]; 
+    if (!plane.IsVisible()) continue;
+
+    assert(plane.GetMeshes().size()  == 1); // Sanity check
+    auto& planeMesh = plane.GetMeshes()[0];
+    assert(planeMesh.GetVertices().size() == 4); // Sanity check
+    assert(planeMesh.GetIndices().size()  == 6); // Sanity check
+    auto& vertices = planeMesh.GetVertices();
+    auto& indices  = planeMesh.GetIndices();
+
+    // Compute plane normal
+    glm::vec4 v0 = glm::vec4((glm::vec3)vertices[indices[0]].position, 1);
+    glm::vec4 v1 = glm::vec4((glm::vec3)vertices[indices[1]].position, 1);
+    glm::vec4 v2 = glm::vec4((glm::vec3)vertices[indices[2]].position, 1);
+    glm::vec4 v3 = glm::vec4((glm::vec3)vertices[indices[5]].position, 1);
+
+    //auto lViewMatrix = m_scene.lights[0].GetViewMatrix();
+    auto modelMatrix = plane.GetModelMatrix();
+
+    auto p0 = glm::vec4(0.f, 0.f, 0.f, 1.f);
+    v0 = viewMatrix * modelMatrix * v0;
+    v1 = viewMatrix * modelMatrix * v1;
+    v2 = viewMatrix * modelMatrix * v2;
+    v3 = viewMatrix * modelMatrix * v3;
+    p0 = viewMatrix * modelMatrix * p0;
+
+    auto v0v1 = v1 - v0;
+    auto v0v3 = v3 - v0;
+    auto v1v2 = v2 - v1;
+
+  
+    // Upload plane data to GPU
+    auto normal = glm::normalize(glm::cross(glm::vec3(v0v3), glm::vec3(v0v1)));
+    std::string uniformBaseName = "uPlanes[" + std::to_string(i) + "]";
+    std::string originFieldUniform = uniformBaseName + ".origin";
+    std::string normalFieldUniform = uniformBaseName + ".normal";
+    std::string v0FieldUniform = uniformBaseName + ".v0";
+    std::string v1FieldUniform = uniformBaseName + ".v1";
+    std::string v2FieldUniform = uniformBaseName + ".v2";
+    std::string v3FieldUniform = uniformBaseName + ".v3";
+
+    compositionShader.SetUniform3f(originFieldUniform.c_str(), p0.x, p0.y, p0.z);
+    compositionShader.SetUniform3f(normalFieldUniform.c_str(), normal.x, normal.y, normal.z);
+    compositionShader.SetUniform3f(v0FieldUniform.c_str(), v0.x, v0.y, v0.z);
+    compositionShader.SetUniform3f(v1FieldUniform.c_str(), v1.x, v1.y, v1.z);
+    compositionShader.SetUniform3f(v2FieldUniform.c_str(), v2.x, v2.y, v2.z);
+    compositionShader.SetUniform3f(v3FieldUniform.c_str(), v3.x, v3.y, v3.z);
+    i++;
+  }
+
+  compositionShader.SetUniform1i("uNPlanes", i);
+}
+
 // Particle system related methods
 #if FLUIDITY_ENABLE_SIMULATOR
 void FluidRenderer::SetFluidType(FluidType type)
@@ -898,4 +962,3 @@ bool FluidRenderer::InitParticleSystem()
 }
 #endif
 }
-

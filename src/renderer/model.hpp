@@ -35,6 +35,11 @@ public:
     const vec3& GetScale() const { return m_scale; }
     void SetScale(const vec3& scale) { m_scale = scale; }
 
+    const vec3& GetRotation() const { return m_rotation; }
+    void SetRotation(const vec3& rotation) { m_rotation = rotation; }
+
+    glm::mat4 GetModelMatrix();
+
     void AddPlane();
 
 private:
@@ -44,6 +49,7 @@ private:
 
     vec3 m_translation    = { 0.f, 0.f, 0.f };
     vec3 m_scale          = { 1.f, 1.f, 1.f };
+    vec3 m_rotation       = { 0.f, 0.f, 0.f };
 
     std::string m_filePath;
     std::vector<Mesh> m_meshes;

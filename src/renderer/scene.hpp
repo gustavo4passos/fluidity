@@ -6,6 +6,7 @@
 #include "simulation/simulated_fluid.hpp"
 #include "utils/camera.hpp"
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <yaml-cpp/yaml.h>
 
@@ -21,11 +22,16 @@ struct Scene
     Camera camera;
     UbMaterial fluidMaterial;
     std::vector<PointLight> lights = {};
-    std::vector<Model> models;
+    std::unordered_map<int, Model> models;
     std::string skyboxPath;
     Vec4 clearColor; 
     bool useSimulatedFluid = false;
     FluidSimulationParameters fluidSimulationParameters;
+
+    // Stores the indices of the planes.
+    // TODO: These should be id's, indices can change.
+    std::vector<int> planes;
+    int lastUsedId = 0;
 
     static Scene CreateEmptyScene() 
     {
@@ -44,10 +50,22 @@ struct Scene
             { }, // Lights
             { }, // Models
             { }, // Skybox path
-            { .5f, .5f, .5f, 1.f }
+            { .5f, .5f, .5f, 1.f }, // Clear color
         };
     }
     
+    int AddModel(const Model& m, int forceId = -1)
+    {
+      int id = forceId == -1 ? lastUsedId++ : forceId;
+      models.emplace(id, m);
+      return id;
+    }
+
+    void RemoveModel(int id)
+    {
+      models.erase(id);
+    }
+
     void AddPlane(const vec3& translation = { 0.f, 0.f, 0.f }, 
         float scale = 1.f)
     {
@@ -55,7 +73,7 @@ struct Scene
       m.AddPlane();
       m.SetScale({ scale, scale, scale });
       m.SetTranslation(translation);
-      models.push_back(m);
+      planes.push_back(AddModel(m));
     }
 };
 
@@ -82,12 +100,18 @@ private:
     Scene m_scene;
     std::string m_filePath;
 
-    void SerializeModel(YAML::Emitter& out, const Model& m);
+    void SerializeModel(YAML::Emitter& out, int id, const Model& m);
     void SerializeNPZFluid(YAML::Emitter& out, const Fluid& f);
     void SerializeSimulatedFluid(YAML::Emitter& out, const FluidSimulationParameters& p);
 
     bool DeserializeNPZFluid(const YAML::Node& node, Fluid& f);
-    bool DeserializeModel(const YAML::Node& node, Model& m);
+
+    struct DeserializedModelStatus
+    {
+      bool  successfullyLoaded;
+      int   id;
+    };
+    DeserializedModelStatus DeserializeModel(const YAML::Node& node, Model& m);
 
     std::string GetRelativePathFromSceneFile(const std::string& path);
     std::string GetAbsolutePathRelativeToScene(const std::string path);

@@ -58,7 +58,8 @@ void main()
     // (and keep the normals intact) or -1 when uInvertNormals is 1 (this inverting the)
     // normals.
     // This avoids branching.
-    fNormal = (-2 * uInvertNormals + 1) * vNormal;  
+    fNormal = mat3(transpose(inverse(model))) * vNormal;
+    fNormal = (-2 * uInvertNormals + 1) * fNormal;  
     fFragPos = (model * vec4(vPos, 1.0)).xyz;
     fFragPosLightSpace = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * model * vec4(vPos, 1.0);
     fFragEyePos = (viewMatrix * model * vec4(vPos, 1.0)).xyz;

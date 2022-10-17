@@ -102,6 +102,21 @@ void Model::CleanUp()
     m_meshes.clear();
 }
 
+glm::mat4 Model::GetModelMatrix()
+{
+    glm::mat4 modelMatrix = modelMatrix = glm::translate(glm::mat4(1.f), glm::vec3(m_translation));
+
+    if (m_rotation.x != 0.f || m_rotation.y != 0.f || m_rotation.z != 0.f)
+    {
+      modelMatrix = glm::rotate(modelMatrix, m_rotation.x, glm::vec3(1.f, 0.f, 0.));
+      modelMatrix = glm::rotate(modelMatrix, m_rotation.y, glm::vec3(0.f, 1.f, 0.));
+      modelMatrix = glm::rotate(modelMatrix, m_rotation.z, glm::vec3(0.f, 0.f, 1.));
+    }
+
+    modelMatrix = glm::scale(modelMatrix, glm::vec3(m_scale));
+    return modelMatrix;
+}
+
 void Model::AddPlane()
 {
   std::vector<Vertex> vertices = {

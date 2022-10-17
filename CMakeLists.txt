@@ -11,6 +11,8 @@ set(BUILD_SHARED_LIBS off)
 # External submodule - cnpy
 add_subdirectory(./external/cnpy)
 
+set(ENABLE_SIMULATOR off)
+
 # Enable simulator
 if (ENABLE_SIMULATOR)
   enable_language(CUDA)

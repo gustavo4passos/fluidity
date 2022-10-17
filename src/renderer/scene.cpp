@@ -366,13 +366,14 @@ void SceneSerializer::Serialize()
         out << Key << "FluidParameters"     << m_scene.fluidParameters;
         out << Key << "LightingParameters"  << m_scene.lightingParameters;
         out << Key << "FluidMaterial"       << m_scene.fluidMaterial;
+        out << Key << "LastUsedId"          << m_scene.lastUsedId;
 
         out << Key << "Lights";
         out << BeginSeq;
             for (const auto& l : m_scene.lights) out << l;
         out << EndSeq;
         out << Key << "Models" << BeginSeq;
-            for (auto& m : m_scene.models) SerializeModel(out, m);
+            for (auto& m : m_scene.models) SerializeModel(out, m.first, m.second);
         out << EndSeq;
         out << Key << "Camera" << m_scene.camera;
         out << Key << "Skybox" << Value << GetRelativePathFromSceneFile(m_scene.skyboxPath);
@@ -384,6 +385,11 @@ void SceneSerializer::Serialize()
         {
           SerializeNPZFluid(out, m_scene.fluid);
         }
+
+        out << Key << "Planes";
+        out << Flow << BeginSeq;
+          for (auto pi : m_scene.planes) out << pi;
+        out << EndSeq;
 
     out << EndMap;
 
@@ -439,23 +445,29 @@ bool SceneSerializer::Deserialize()
         sc.camera = root["Camera"].as<Camera>();
     }
 
+    if (root["LastUsedId"])
+    {
+      sc.lastUsedId = root["LastUsedId"].as<int>();
+    }
+
     if (root["Models"] && root["Models"].IsSequence())
     {
         for (const auto& m : root["Models"])
         {
             Model preloadedModel;
             // If model didn't deserialize properly, don't add it to scene
-            if (!DeserializeModel(m, preloadedModel))
+            auto deserializeModelStatus = DeserializeModel(m, preloadedModel);
+            if (!deserializeModelStatus.successfullyLoaded)
             {
                 LOG_ERROR(m_filePath + ": Unable to load model " + preloadedModel.GetFilePath());
                 continue;
             }
 
-            if (preloadedModel.Load())
+            if (deserializeModelStatus.id == -1)
             {
-                sc.models.push_back(preloadedModel);
-            }
-            else LOG_ERROR("Unable to load model: " + preloadedModel.GetFilePath());
+              sc.AddModel(preloadedModel);
+            } 
+            else sc.models.emplace(deserializeModelStatus.id, preloadedModel);
         }
     }
 
@@ -488,21 +500,33 @@ bool SceneSerializer::Deserialize()
       }
 #endif
 
+      if (root["Planes"])
+      {
+        if (root["Planes"].IsSequence())
+        {
+          for (int i = 0; i < root["Planes"].size(); i++)
+          {
+            sc.planes.push_back(root["Planes"][i].as<int>());
+          }
+        }
+      }
     }
     // TODO: Unecessary copy
     m_scene = sc;
     return true;
 }
 
-void SceneSerializer::SerializeModel(YAML::Emitter& out, const Model& m)
+void SceneSerializer::SerializeModel(YAML::Emitter& out, int id, const Model& m)
 {
     using namespace YAML;
     out << BeginMap;
+        out << Key << "id"               << Value << id;
         out << Key << "filePath"         << Value << GetRelativePathFromSceneFile(m.GetFilePath());
         out << Key << "genSmoothNormals" << Value << m.HasSmoothNormals();
         out << Key << "material"         << Value << m.GetMaterialConst();
         out << Key << "hideFrontFaces"   << Value << m.GetHideFrontFaces();
         out << Key << "translation"      << Value << m.GetTranslation();
+        out << Key << "rotation"         << Value << m.GetRotation();
         out << Key << "scale"            << Value << m.GetScale();
         out << Key << "visible"          << Value << m.IsVisible();
     out << EndMap;
@@ -560,13 +584,40 @@ bool SceneSerializer::DeserializeNPZFluid(const YAML::Node& node, Fluid& f)
 }
 
 
-bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
+SceneSerializer::DeserializedModelStatus SceneSerializer::DeserializeModel(
+    const YAML::Node& node, Model& m)
 {
-    if (!node.IsMap()) return false;
+    DeserializedModelStatus  dm;
+    dm.successfullyLoaded = false;
+    dm.id = -1; // Id unknown
 
-    auto filePath = GetAbsolutePathRelativeToScene(node["filePath"].as<std::string>());
-    auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
-    m = Model(filePath, genSmoothNormals);
+    if (!node.IsMap()) return dm;
+
+    if (node["id"])
+    {
+      dm.id = node["id"].as<int>();
+    }
+
+    // TODO: There's a better way to to this. Maybe add a flag to the model
+    // informing if it comes from a file or not.
+    auto filePath = node["filePath"].as<std::string>();
+
+    if (filePath == "")
+    {
+      m = Model();
+      m.AddPlane();
+      dm.successfullyLoaded = true;
+    }
+    else 
+    {
+      auto absoluteFilePath = GetAbsolutePathRelativeToScene(filePath);
+      auto genSmoothNormals = node["genSmoothNormals"].as<bool>();
+      m = Model(absoluteFilePath, genSmoothNormals);
+      if (m.Load())
+      {
+        dm.successfullyLoaded = true;
+      }
+    }
 
     if (node["material"])
     {
@@ -586,6 +637,12 @@ bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
         m.SetTranslation(translation);
     }
 
+    if (node["rotation"])
+    {
+      auto rotation = node["rotation"].as<vec3>();
+      m.SetRotation(rotation);
+    }
+
     if (node["scale"])
     {
         auto scale = node["scale"].as<vec3>();
@@ -598,7 +655,7 @@ bool SceneSerializer::DeserializeModel(const YAML::Node& node, Model& m)
         m.SetIsVisible(visible);
     }
 
-    return true;
+    return dm;
 }
 
 

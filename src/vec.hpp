@@ -1,4 +1,6 @@
 #pragma once 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 struct vec2 {
     float x;
@@ -9,6 +11,13 @@ struct vec3 {
     float x;
     float y;
     float z;
+
+    vec3 operator-(const vec3& v)
+    {
+      return { x - v.x, y - v.y, z - v.z };
+    }
+    
+    operator glm::vec3() const { return { x, y, z }; }
 };
 
 struct dVec3 {
@@ -41,32 +50,55 @@ struct CameraData {
   Vec4 camPosition;
 };
 
-struct PointLight {
-  Vec4 ambient;
-  Vec4 diffuse;
-  Vec4 specular;
-  Vec4 position;
-};
-
 struct LightMatrix
 {
   Mat4 viewMatrix;
   Mat4 projectionMatrix;
 };
 
-struct UbMaterial {
+struct PointLight {
   Vec4 ambient;
   Vec4 diffuse;
   Vec4 specular;
+  Vec4 position;
+
+  static float GetLightZFar()
+  {
+    return 100.f;
+  }
+
+  static float GetLightZNear()
+  {
+    return 1.f;
+  }
+
+  glm::mat4 GetProjectionMatrix()
+  {
+    const float radius = 10.f;
+    return glm::ortho(-radius, radius, -radius, radius, GetLightZNear(), GetLightZFar());
+  }
+
+  glm::mat4 GetViewMatrix()
+  {
+    return glm::lookAt(glm::vec3(position.x, position.y, position.z),
+              glm::vec3(0), // directional light, pointing at scene origin
+              glm::vec3(0, 1.0, 0)); // Up
+  }
+};
+
+struct UbMaterial {
+  Vec4  ambient;
+  Vec4  diffuse;
+  Vec4  specular;
   float shininess;
 };
 
 struct Material {
-  vec3 ambient;
-  vec3 diffuse;
-  vec3 specular;
+  vec3  ambient;
+  vec3  diffuse;
+  vec3  specular;
   float shininess;
-  bool emissive;
+  bool  emissive;
   float reflectiveness;
 };
 

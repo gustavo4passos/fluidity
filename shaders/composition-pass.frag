@@ -100,6 +100,7 @@ uniform float uMaxShadowBias;
 uniform float uRefractionModifier;
 uniform int   uUseRefractionMask;
 uniform int   uTwoSidedRefractions; 
+uniform float uRefractiveIndex;
 
 // in/out
 in vec2  f_TexCoord;
@@ -216,7 +217,9 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
     else te = tStar;
 
     i++;
-    if (i == 40)
+    // TODO: Should this always converge?
+    // Give up after 10 iterations
+    if (i == 10)
     {
         intersection = tStar;
         break;
@@ -224,6 +227,68 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
   }
 
   return Pf + intersection * Tf;
+}
+
+
+// Fluidity - Ray-plane intersections
+// Find intersection between a ray and planes in the world.
+// Used to find where a refraction ray hits.
+uniform int uNPlanes;
+const int MAX_N_PLANES = 5;
+
+struct PlaneData 
+{
+  vec3 origin;
+  vec3 normal;
+  vec3 v0;
+  vec3 v1;
+  vec3 v2;
+  vec3 v3;
+};
+
+uniform PlaneData uPlanes[MAX_N_PLANES];
+
+struct IntersectionData
+{
+  bool intersects;
+  float t;
+};
+
+// Finds t such that t * lineV is the projected vector
+// Line V that definse the line span(v)
+float ProjectVectorOntoLineT(vec3 lineV, vec3 v)
+{
+  return dot(lineV, v) / dot(lineV, lineV); 
+}
+
+IntersectionData FindRayPlaneIntersection(PlaneData plane, vec3 rayOrigin, vec3 rayDirection)
+{
+  IntersectionData result;
+  result.intersects = false;
+  result.t = 0;
+
+  float denom = dot(plane.normal, rayDirection);
+  if (abs(denom) < 1e-6) return result;
+
+  vec3 rayOriginToPlaneCenter = plane.origin - rayOrigin;
+  result.t = dot(rayOriginToPlaneCenter, plane.normal) / denom;
+
+  // Moves vertices to origin to find projection
+  vec3 v1o = plane.v1 - plane.v0;
+  vec3 v3o = plane.v3 - plane.v0;
+  vec3 into = (rayOrigin + rayDirection * result.t) - plane.v0;
+
+  float tx = ProjectVectorOntoLineT(v1o, into);
+  float ty = ProjectVectorOntoLineT(v3o, into);
+
+  // If the projection of the intersection vector falls outside on any of the projection, 
+  // the point is not inside the plane section
+  if (tx >= 0 && tx <= 1 && ty >= 0 && ty <= 1)
+  {
+    result.intersects = true;
+  }
+
+  return result;
 }
 
 const int lightID = 0;
@@ -323,7 +388,7 @@ void main()
     // I'm doing here.
     // TODO: For some reason world-space reflection is failing from some angles.
     // I'm switching to eye-space for now until I find out why.
-    vec3 viewDirWorld = uvToSpace(f_TexCoord, eyeDepth).xyz - (camPosition).xyz;
+    vec3 viewDirWorld = normalize(uvToSpace(f_TexCoord, eyeDepth).xyz - (camPosition).xyz);
     vec3 frontNormal = texture(u_FrontNormalTex, f_TexCoord).xyz;
     vec3 frontNormalWorld = normalize(mat3(transpose(viewMatrix)) * frontNormal);
 #if ENABLE_WORLD_SPACE_REFLECTION
@@ -336,8 +401,7 @@ void main()
     //Color Attenuation from Thickness (Beer's Law)
     vec3 colorAttennuation = computeAttennuation(thickness * 5.0f);
     colorAttennuation = mix(vec3(1, 1, 1), colorAttennuation, u_AttennuationConstant);
-    vec3 refractionDir = normalize(refract(-viewer, N, 1.0 / refractiveIndex));
-    refractionDir = normalize(mat3(transpose(viewMatrix)) * refractionDir) * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
+    vec3 refractionDir = normalize(refract(-viewer, N, uRefractiveIndex));
     vec2 refractionDisplacement = refractionDir.xy * uRefractionModifier * thickness * u_AttennuationConstant * 0.1f;
     vec3 refractionColor;
 
@@ -347,18 +411,40 @@ void main()
       vec3 intersection = findRefractionIntersection(f_TexCoord, eyeDepth, viewer);
       vec3 projectedIntersection = eyeToScreen(intersection);
 
-      vec3 Tf = normalize(refract(-viewer, frontNormal, eta));
+      vec3 Tf                   = normalize(refract(-viewer, frontNormal, eta));
       vec3 normalAtIntersection = texture(u_BackNormalTex, projectedIntersection.xy).xyz;
-      vec3 finalRefractionDir = normalize(refract(Tf, normalAtIntersection, eta));
+      vec3 finalRefractionDir   = normalize(refract(Tf, normalAtIntersection, eta));
 
-      vec3 TfWorld = refract(viewDirWorld, frontNormalWorld, eta);
-      vec3 normalAtIntersectionWorld = normalize(mat3(transpose(inverse(invViewMatrix))) * normalAtIntersection);
-      finalRefractionDir = refract(TfWorld, normalAtIntersectionWorld, refractiveIndex);
-      refractionColor = texture(u_SkyBoxTex, finalRefractionDir).xyz * colorAttennuation;
+      vec3 TfWorld = normalize(refract(viewDirWorld, frontNormalWorld, uRefractiveIndex));
+      vec3 normalAtIntersectionWorld = normalize(mat3(transpose(viewMatrix)) * normalAtIntersection);
+      vec3 refractionDirWorld = normalize(refract(TfWorld, normalAtIntersectionWorld, uRefractiveIndex));
+      refractionColor         = texture(u_SkyBoxTex, refractionDirWorld).xyz * colorAttennuation;
+    
+#if ENABLE_BACK_SURFACE_SPECULAR
+        // Specular at the back surface
+        vec3  viewerBack = normalize(-intersection);
+        vec3  H        = normalize(lightDir + viewerBack);
+        specular += pow(max(0.0f, dot(H, normalAtIntersection)), material.shininess);
+#endif
+      float closestIntersectionT = -farZ;
+      for(int i = 0; i < uNPlanes; i++)
+      {
+        IntersectionData iData = FindRayPlaneIntersection(uPlanes[i], intersection, finalRefractionDir);
+        if (iData.intersects)
+        {
+          vec3 pIntersection = intersection + finalRefractionDir * iData.t;
+          vec3 pIntersectionScreen = eyeToScreen(pIntersection);
+          float solidDepthAtRefractionPoint = texture(u_SolidDepthMap, pIntersectionScreen.xy).r;
+          if (pIntersectionScreen.z > closestIntersectionT)
+          {
+            refractionColor = texture(u_BackgroundTex, pIntersectionScreen.xy).xyz * colorAttennuation;
+            closestIntersectionT = pIntersection.z;
+          }
+        }
+      }
     }
     else
     {
-
       // Fluidity - Refraction mask
       if (uUseRefractionMask == 1)
       {

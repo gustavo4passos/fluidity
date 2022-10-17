@@ -55,6 +55,9 @@ private:
   void SetVAOS();
   void SetNumberOfParticles();
 
+  void SetUpPlanes();
+  void ComputePlanesParameters();
+
   Shader* m_skybBoxShader;
   // Render passes
   TextureRenderer*    m_textureRenderer;

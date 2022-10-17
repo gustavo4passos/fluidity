@@ -21,6 +21,7 @@ struct FluidParameters
   float refractionModifier = 1.0;
   bool  twoSidedRefractions = false;
   float reflectionConstant = 0.0;
+  float refractiveIndex = 0.85;
 };
 
 struct LightingParameters

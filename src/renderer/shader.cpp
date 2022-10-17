@@ -194,7 +194,8 @@ GLint Shader::GetUniformLocation(const std::string& name, bool silentFail) {
   GLint location = glGetUniformLocation(this->_programID, name.c_str());
 
   // If uniform isn't found in program
-  if(location == -1 && !silentFail) LOG_ERROR("in shader " + _vertexShaderFilepath + " Unable to find uniform: " + name);
+  if(location == -1 && !silentFail) LOG_ERROR("in shader " + _vertexShaderFilepath + 
+      ", " + _fragmentShaderFilepath + ": Unable to find uniform: " + name);
 
   return location;
 }
