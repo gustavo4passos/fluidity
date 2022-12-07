@@ -51,12 +51,14 @@ private:
   void SetUpPerFrameUniforms();
   void RenderMeshes();
   void DoFiltering();
+  void PrepareForCaustics();
+  void RenderCaustics();
 
   void SetVAOS();
   void SetNumberOfParticles();
 
   void SetUpPlanes();
-  void ComputePlanesParameters();
+  void ComputePlanesParameters(glm::mat4& viewMatrix, Shader& shader);
 
   Shader* m_skybBoxShader;
   // Render passes
@@ -69,10 +71,14 @@ private:
   FilterPass*         m_filterPass;
   FilterPass*         m_normalPass;
   FilterPass*         m_compositionPass;
+  FilterPass*         m_inverterPass;
   MeshesPass*         m_meshesPass;
   MeshesPass*         m_meshesShadowPass;
 
-  FilterPass*         m_inverterPass;
+  // Caustics
+  FilterPass*         m_causticsPass;
+  MeshesPass*         m_causticsPolygonPass;
+  Scene               m_causticsScene; // TODO: Only a workaround to get working for now. Should not be necessary a scene for caustics
 
   CameraController m_cameraController;
 
@@ -89,6 +95,7 @@ private:
   Scene m_scene;
   Model m_lightModel;
   Model m_colliderModel;
+  Model m_causticsModel;
 
   unsigned m_windowWidth;
   unsigned m_windowHeight;

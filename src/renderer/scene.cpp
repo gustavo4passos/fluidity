@@ -34,8 +34,12 @@ struct YAML::convert<fluidity::FluidParameters>
         fp.transparentFluid  = node[1].as<bool>();
         fp.pointRadius       = node[2].as<float>();
 
-        if (node.size() > 3) fp.refractionModifier = node[3].as<float>();
+        if (node.size() > 3) fp.refractionModifier  = node[3].as<float>();
         if (node.size() > 4) fp.twoSidedRefractions = node[4].as<bool>();
+        if (node.size() > 5) fp.renderCaustics      = node[5].as<bool>();
+        if (node.size() > 6) fp.backSurfaceSpecular = node[6].as<bool>();
+        if (node.size() > 7) fp.reflectionConstant  = node[7].as<float>();
+        if (node.size() > 8) fp.refractiveIndex     = node[8].as<float>();
         return true;
     }
 };
@@ -223,7 +227,9 @@ YAML::Emitter& operator << (YAML::Emitter& out, const FluidParameters& fluidPara
     const FluidParameters& fp = fluidParameters;
     out << YAML::Flow;
     out << YAML::BeginSeq << fp.attenuation << fp.transparentFluid 
-      << fp.pointRadius << fp.refractionModifier << fp.twoSidedRefractions;
+      << fp.pointRadius << fp.refractionModifier << fp.twoSidedRefractions
+      << fp.renderCaustics << fp.backSurfaceSpecular << fp.reflectionConstant
+      << fp.refractiveIndex;
     out << YAML::EndSeq;
 
     return out;

@@ -11,7 +11,7 @@ set(BUILD_SHARED_LIBS off)
 # External submodule - cnpy
 add_subdirectory(./external/cnpy)
 
-set(ENABLE_SIMULATOR off)
+set(ENABLE_SIMULATOR on)
 
 # Enable simulator
 if (ENABLE_SIMULATOR)

@@ -1,10 +1,10 @@
 #pragma once
 #include "renderer/generic_fluid.hpp"
-#include <particleSystem.h>
-#include <assert.h>
-
 #define FLUIDITY_ENABLE_SIMULATOR 1
 #if FLUIDITY_ENABLE_SIMULATOR
+#include <particleSystem.h>
+#include <assert.h>
+#endif
 
 struct FluidSimulationParameters
 {
@@ -19,6 +19,8 @@ struct FluidSimulationParameters
     float m_timestep          = 0.5f;
 };
 
+
+#if FLUIDITY_ENABLE_SIMULATOR
 class SimulatedFluid  {
 public: 
     explicit SimulatedFluid()

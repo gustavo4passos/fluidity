@@ -92,6 +92,7 @@ auto FluidRenderer::Init() -> bool
   // Used to invert the g component of the dual peeled depth textures.
   // Depth in those textures are saved as vec3(frontD, -backD, 0, 1),
   // So this pass transforms -backD to backD for further passes
+  // TODO: Is there a way to avoid this?
   m_inverterPass = new FilterPass(
       m_windowWidth,
       m_windowHeight,
@@ -106,6 +107,7 @@ auto FluidRenderer::Init() -> bool
     m_windowHeight,
     { 
       { GL_RGBA32F, GL_RGBA, GL_FLOAT },
+      { GL_R32F, GL_RED, GL_FLOAT },
     },
     "../../shaders/composition-pass.frag"
   );
@@ -113,8 +115,10 @@ auto FluidRenderer::Init() -> bool
   m_meshesPass = new MeshesPass(
     m_windowWidth,
     m_windowHeight,
-    "../../shaders/mesh.vert", 
-    "../../shaders/mesh.frag",
+    { 
+      "../../shaders/mesh.vert", 
+      "../../shaders/mesh.frag",
+    },
     { 
       { GL_RGB32F, GL_RGB, GL_FLOAT },
       { GL_R32F,   GL_RED, GL_FLOAT }
@@ -125,9 +129,12 @@ auto FluidRenderer::Init() -> bool
   m_meshesShadowPass = new MeshesPass(
     2048, // Shadow map resolution 
     2048,
-    "../../shaders/mesh-shadow.vert",
-    "../../shaders/mesh-shadow.frag",
     {
+      "../../shaders/mesh-shadow.vert",
+      "../../shaders/mesh-shadow.frag",
+    },
+    {
+      { GL_R32F, GL_RED, GL_FLOAT },
       { GL_R32F, GL_RED, GL_FLOAT }
     },
     &m_scene
@@ -138,9 +145,9 @@ auto FluidRenderer::Init() -> bool
     2048,
     0,
     currentVao,
-    { GL_R32F, GL_RED, GL_FLOAT },
-    "../../shaders/fluid-shadow.vs",
-    "../../shaders/fluid-shadow.fs"
+    { GL_RGB32F, GL_RGB, GL_FLOAT },
+    "../../shaders/fluid-shadow-dual.vert",
+    "../../shaders/fluid-shadow-dual.frag"
   );
 
   m_thicknessShadowPass = new ParticlePass(
@@ -153,6 +160,41 @@ auto FluidRenderer::Init() -> bool
     "../../shaders/thickness-shadow.frag"
   );
 
+  // Caustics
+  m_causticsPass = new FilterPass(
+      1366,
+      768,
+      {
+        { GL_RGBA32F, GL_RGBA, GL_FLOAT }, // Photon final location
+        { GL_RGB32F,  GL_RGB,  GL_FLOAT },  // No specular hit
+        { GL_R32F,    GL_RED,  GL_FLOAT }  // Debug
+      },
+      "../../shaders/caustics-pass.frag"
+  );
+
+  PrepareForCaustics();
+
+  m_causticsScene = Scene::CreateEmptyScene();
+  m_causticsScene.AddModel(m_causticsModel);
+
+  m_causticsPolygonPass = new MeshesPass(
+      m_windowWidth,
+      m_windowHeight,
+      {
+        "../../shaders/caustics-polygon.vert",
+        "../../shaders/caustics-polygon.frag",
+        "../../shaders/caustics-polygon.geom"
+      },
+      {
+        { GL_RGBA32F, GL_RGBA, GL_FLOAT }
+      },
+      &m_causticsScene 
+  );
+
+  {
+
+  }
+
   m_renderPasses["ParticleRenderPass"] = m_particleRenderPass;
   m_renderPasses["DepthPass"]          = m_depthPass;
   m_renderPasses["FilterPass"]         = m_filterPass;
@@ -164,6 +206,8 @@ auto FluidRenderer::Init() -> bool
   m_renderPasses["FluidShadowPass"]    = m_fluidShadowPass;
   m_renderPasses["ThicknessShadow"]    = m_thicknessShadowPass;
   m_renderPasses["InverterPass"]       = m_inverterPass;
+  m_renderPasses["CausticsPass"]       = m_causticsPass;
+  m_renderPasses["CausticsPolyPass"]   = m_causticsPolygonPass;
 
   for (auto& renderPassPair : m_renderPasses)
   {
@@ -221,11 +265,29 @@ auto FluidRenderer::Init() -> bool
 
   // Fluid shadow pass -> Setup
   {
-    auto& m_fluidShadowRenderState = m_fluidShadowPass->GetRenderState();
-    m_fluidShadowRenderState.useDepthTest = true;
-    m_fluidShadowRenderState.clearColor = { 1.f, 1.f, 1.f, 1.f };
+    auto& fluidShadowRenderState = m_fluidShadowPass->GetRenderState();
+    fluidShadowRenderState.useBlend      = true;
+    fluidShadowRenderState.blendEquation = GL_MAX;
+    fluidShadowRenderState.useDepthTest  = false;
+    m_fluidShadowPass->SetRenderState(fluidShadowRenderState);
   }
 
+  // Caustics pass -> Setup
+  {
+    auto renderState = m_causticsPass->GetRenderState();
+    renderState.clearColor = { -PointLight::GetZFar(), -PointLight::GetZFar(), -PointLight::GetZFar(), -PointLight::GetZFar() };
+    m_causticsPass->SetRenderState(renderState);
+  }
+  // Caustics polygon pass -> Setup
+  {
+    auto renderState = m_causticsPolygonPass->GetRenderState();
+    renderState.useBlend                = true;
+    renderState.useDepthTest            = false;
+    renderState.blendSourceFactor       = GL_ONE;
+    renderState.blendDestinationFactor  = GL_ONE;
+    renderState.clearColor              = Vec4{ 0.f, 0.f, 0.f, 0.f };
+    m_causticsPolygonPass->SetRenderState(renderState);
+  }
 
   // Load light model - Represents the light in the scene
   m_lightModel.Load();
@@ -459,7 +521,6 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     auto& depthPassShader = m_depthPass->GetShader();
     depthPassShader.Bind();
     depthPassShader.SetUniform1i("u_UseAnisotropyKernel", 0);
-    depthPassShader.SetUniform1f("u_PointRadius", fluidParameters.pointRadius);
     depthPassShader.SetUniform1i("u_ScreenWidth", m_windowWidth);
     depthPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     depthPassShader.Unbind();
@@ -473,6 +534,7 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     meshesPassSahder.SetUniform1i("uSkybox", 1);
     meshesPassSahder.SetUniform1i("uFluidShadowMap", 2);
     meshesPassSahder.SetUniform1i("uFluidShadowThicknessMap", 3);
+    meshesPassSahder.SetUniform1i("uCausticsMap", 4);
     meshesPassSahder.Unbind(); 
   }
 
@@ -528,7 +590,6 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     compositionPassShader.SetUniform1i("u_ScreenHeight", m_windowHeight);
     compositionPassShader.SetUniform1i("u_DepthTex",                  0);
     compositionPassShader.SetUniform1i("u_HasSolid",                  1);
-    compositionPassShader.SetUniform1i("u_DepthTex",                  0);
     compositionPassShader.SetUniform1i("u_ThicknessTex",              1);
     compositionPassShader.SetUniform1i("u_FrontNormalTex",            2);
     compositionPassShader.SetUniform1i("u_BackgroundTex",             3);
@@ -544,6 +605,27 @@ auto FluidRenderer::SetUpStaticUniforms() -> void
     compositionPassShader.Unbind();
   }
 
+  // Caustics pass -> Init uniforms
+  {
+    auto& causticsPassShader = m_causticsPass->GetShader();
+    causticsPassShader.Bind();
+    causticsPassShader.SetUniform1i("uFluidDepth",       0);
+    causticsPassShader.SetUniform1i("uFrontFaceNormals", 1);
+    causticsPassShader.SetUniform1i("uBackFaceNormals",  2);
+    causticsPassShader.SetUniform1i("uSolidDepth",       3);
+    causticsPassShader.SetUniform1f("uNearZ", PointLight::GetZNear());
+    causticsPassShader.SetUniform1f("uFarZ", PointLight::GetZFar());
+    causticsPassShader.Unbind();
+  }
+  {
+    auto& causticsPolygonShader = m_causticsPolygonPass->GetShader();
+    causticsPolygonShader.Bind();
+    causticsPolygonShader.SetUniform1i("uCausticsPolygon",       0);
+    causticsPolygonShader.SetUniform1i("noSpecularHitMap",       1);
+    causticsPolygonShader.SetUniform1f("uNearZ", PointLight::GetZNear());
+    causticsPolygonShader.SetUniform1f("uFarZ", PointLight::GetZFar());
+    causticsPolygonShader.Unbind();
+  }
   // Fluid shadow pass -> Init uniforms 
   {
     auto& fluidShadowShader = m_fluidShadowPass->GetShader();
@@ -583,6 +665,7 @@ void FluidRenderer::SetUpPerFrameUniforms()
   meshesShader.SetUniform1f("uShadowIntensity", lightingParameters.shadowIntensity);
   meshesShader.SetUniform1f("uFluidShadowIntensity", lightingParameters.fluidShadowIntensity);
   meshesShader.SetUniform1i("uUsePcf", lightingParameters.usePcf ? 1 : 0);
+  meshesShader.SetUniform1i("uRenderCaustics", fluidParameters.renderCaustics ? 1 : 0);
   meshesShader.Unbind();
 
   auto& compositionPassShader = m_compositionPass->GetShader();
@@ -603,6 +686,8 @@ void FluidRenderer::SetUpPerFrameUniforms()
   compositionPassShader.SetUniform1i("uUseRefractionMask", filteringParameters.useRefractionMask ? 1 : 0);
   compositionPassShader.SetUniform1f("u_ReflectionConstant", fluidParameters.reflectionConstant);
   compositionPassShader.SetUniform1f("uRefractiveIndex", fluidParameters.refractiveIndex);
+  compositionPassShader.SetUniform1f("u_ParticleRadius", fluidParameters.pointRadius);
+  compositionPassShader.SetUniform1i("uBackSurfaceSpecular", fluidParameters.backSurfaceSpecular ? 1 : 0);
   compositionPassShader.Unbind();
 
   auto& narrowFilterShader = m_filterPass->GetShader();
@@ -633,6 +718,10 @@ void FluidRenderer::SetUpPerFrameUniforms()
   auto& normalPassShader = m_normalPass->GetShader();
   normalPassShader.Bind();
   normalPassShader.SetUniform1i("u_frontAndBackNormals", fluidParameters.twoSidedRefractions ? 1 : 0);
+
+  auto& causticsPassShader = m_causticsPass->GetShader();
+  causticsPassShader.Bind();
+  causticsPassShader.SetUniform1f("uRefractiveIndex", fluidParameters.refractiveIndex);
 
   m_textureRenderer->SetGammaCorrectionEnabled(filteringParameters.gammaCorrection);
 }
@@ -676,7 +765,20 @@ auto FluidRenderer::Render() -> void
     m_fluidShadowPass->Render();
     m_thicknessShadowPass->Render();
   
+    if (m_scene.lightingParameters.renderShadows)
+    {
+      m_meshesShadowPass->Render();
+      m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
+    }
+
+
+    if (m_scene.fluidParameters.renderCaustics)
+    {
+      RenderCaustics();
+    }
+
     RenderMeshes();
+    
     DoFiltering();
     
     depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
@@ -690,7 +792,9 @@ auto FluidRenderer::Render() -> void
     m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(),           3 });
     m_compositionPass->SetInputTexture({ m_meshesPass->GetBuffer(1),          4 });
     m_compositionPass->SetInputTexture({ m_meshesShadowPass->GetBuffer(0),    5 });
-    m_compositionPass->SetInputTexture({ m_filterPass->GetBuffer(0),          7 });
+#if ENABLE_COMPOSITION_SHADOWS
+    m_compositionPass->SetInputTexture({ m_fluidShadowPass->GetBuffer(0),     7 });
+#endif
     m_compositionPass->SetInputTexture({ m_thicknessShadowPass->GetBuffer(0), 8 });
     m_compositionPass->SetInputTexture({ m_normalPass->GetBuffer(1),          9 });
     
@@ -704,7 +808,11 @@ auto FluidRenderer::Render() -> void
     m_compositionPass->Render();
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-    m_textureRenderer->SetTexture(m_compositionPass->GetBuffer());
+    if (m_scene.filteringParameters.useRefractionMask)
+    {
+      m_textureRenderer->SetTexture(m_causticsPolygonPass->GetBuffer());
+    }
+    else m_textureRenderer->SetTexture(m_compositionPass->GetBuffer());
   }
   else
   {
@@ -715,6 +823,13 @@ auto FluidRenderer::Render() -> void
       meshesPassShader.Bind();
       meshesPassShader.SetUniform1i("uRenderFluidShadows", 0);
     }
+
+    if (m_scene.lightingParameters.renderShadows)
+    {
+      m_meshesShadowPass->Render();
+      m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
+    }
+
     RenderMeshes();
     m_textureRenderer->SetTexture(m_meshesPass->GetBuffer());
   }
@@ -778,11 +893,6 @@ void FluidRenderer::RenderMeshes()
   }
 #endif
 
-    if (m_scene.lightingParameters.renderShadows)
-    {
-      m_meshesShadowPass->Render();
-      m_meshesPass->SetInputTexture(m_meshesShadowPass->GetBuffer());
-    }
     // Places light model in the scene
     int lightModelId;
     if (m_scene.lightingParameters.showLightsOnScene)
@@ -800,6 +910,11 @@ void FluidRenderer::RenderMeshes()
     else m_meshesPass->SetInputTexture({ 0, 1, TextureType::Cubemap });
     m_meshesPass->SetInputTexture({ m_fluidShadowPass->GetBuffer(), 2 });
     m_meshesPass->SetInputTexture({ m_thicknessShadowPass->GetBuffer(), 3 });
+
+    if (m_scene.fluidParameters.renderCaustics)
+    {
+      m_meshesPass->SetInputTexture({ m_causticsPolygonPass->GetBuffer(), 4 });
+    }
 
     // Set background clear color (comes from meshes rendering, for now)
     m_meshesPass->GetRenderState().clearColor = m_scene.clearColor;
@@ -853,16 +968,116 @@ void FluidRenderer::DoFiltering()
     }
 }
 
-void FluidRenderer::SetUpPlanes()
+void FluidRenderer::PrepareForCaustics()
 {
-  ComputePlanesParameters();
+  std::vector<Vertex> vertices;
+  std::vector<unsigned> indices;
+
+  for (int y = m_windowHeight; y > 0; y--)
+  {
+    for (int x = 0; x < m_windowWidth; x++)
+    {
+      Vertex v;
+      float vx, vy;  
+      vx = (float)x / m_windowWidth;
+      vy = (float)y / m_windowHeight;
+
+      v.position = { vx, vy, 0.f };
+      vertices.push_back(v);
+    }
+  }
+
+  for (int y = 0; y < m_windowHeight - 1; y++)
+  {
+    for (int x = 0; x < m_windowWidth - 1; x++)
+    {
+      int i0,i1,i2,i3;
+      i0 = y * m_windowWidth + x;
+      i1 = i0 + 1;
+      i3 = i0 + m_windowWidth;
+      i2 = i3 + 1;
+
+      indices.push_back(i0);
+      indices.push_back(i1);
+      indices.push_back(i2);
+      indices.push_back(i0);
+      indices.push_back(i2);
+      indices.push_back(i3);
+    }
+  }
+
+  Mesh m = { vertices, indices };
+  m.Init();
+  m_causticsModel.GetMeshes().push_back(m);
+}
+void FluidRenderer::RenderCaustics()
+{
+
+    m_inverterPass->SetInputTexture(m_fluidShadowPass->GetBuffer());
+    m_inverterPass->Render();
+    GLuint depthTexture = m_inverterPass->GetBuffer();
+
+    if (m_scene.filteringParameters.filter1D)
+    {
+      auto& filterShader = m_filterPass->GetShader();
+      for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+      {
+        if (i == 0) m_filterPass->SetInputTexture(depthTexture);
+        else m_filterPass->SwapBuffers();
+
+        filterShader.Bind();
+        filterShader.SetUniform1i("u_FilterDirection", 0);
+        m_filterPass->Render();
+        m_filterPass->SwapBuffers();
+        
+        filterShader.Bind();
+        filterShader.SetUniform1i("u_FilterDirection", 1);
+        m_filterPass->Render();
+      }
+    }
+    else
+    {
+      for (int i = 0; i < m_scene.filteringParameters.nIterations; i++)
+      {
+        if (i == 0) m_filterPass->SetInputTexture(depthTexture);
+        else m_filterPass->SwapBuffers();
+        m_filterPass->Render();
+      }
+    }
+
+    depthTexture = m_scene.filteringParameters.nIterations > 0 ? m_filterPass->GetBuffer() : 
+      m_inverterPass->GetBuffer();
+
+    m_normalPass->SetInputTexture({ depthTexture, 0 });
+    m_normalPass->Render();
+
+    m_causticsPass->SetInputTexture({ depthTexture,                     0 });
+    m_causticsPass->SetInputTexture({ m_normalPass->GetBuffer(0),       1 });
+    m_causticsPass->SetInputTexture({ m_normalPass->GetBuffer(1),       2 });
+    m_causticsPass->SetInputTexture({ m_meshesShadowPass->GetBuffer(1), 3 });
+    m_causticsPass->Render();
+
+    m_causticsPolygonPass->SetInputTexture({ m_causticsPass->GetBuffer() , 0 });
+    m_causticsPolygonPass->SetInputTexture({ m_causticsPass->GetBuffer(1), 1 });
+    m_causticsPolygonPass->Render();
 }
 
-void FluidRenderer::ComputePlanesParameters()
+void FluidRenderer::SetUpPlanes()
 {
+  // Compute planes from light perspective, for caustics
+  auto& causticsPassShader = m_causticsPass->GetShader();
+  auto& lightViewMatrix    = m_scene.lights[0].GetViewMatrix();
+  ComputePlanesParameters(lightViewMatrix, causticsPassShader);
+
+  // Compute planes from camera perspective
   auto& compositionShader = m_compositionPass->GetShader();
-  compositionShader.Bind();
-  auto viewMatrix = m_cameraController.GetCamera().GetViewMatrix();
+  auto cameraViewMatrix = m_cameraController.GetCamera().GetViewMatrix();
+  ComputePlanesParameters(cameraViewMatrix, compositionShader);
+}
+
+void FluidRenderer::ComputePlanesParameters(glm::mat4& viewMatrix, Shader& shader)
+{
+  shader.Bind();
 
   int i = 0;
   for (auto pi : m_scene.planes)
@@ -909,16 +1124,16 @@ void FluidRenderer::ComputePlanesParameters()
     std::string v2FieldUniform = uniformBaseName + ".v2";
     std::string v3FieldUniform = uniformBaseName + ".v3";
 
-    compositionShader.SetUniform3f(originFieldUniform.c_str(), p0.x, p0.y, p0.z);
-    compositionShader.SetUniform3f(normalFieldUniform.c_str(), normal.x, normal.y, normal.z);
-    compositionShader.SetUniform3f(v0FieldUniform.c_str(), v0.x, v0.y, v0.z);
-    compositionShader.SetUniform3f(v1FieldUniform.c_str(), v1.x, v1.y, v1.z);
-    compositionShader.SetUniform3f(v2FieldUniform.c_str(), v2.x, v2.y, v2.z);
-    compositionShader.SetUniform3f(v3FieldUniform.c_str(), v3.x, v3.y, v3.z);
+    shader.SetUniform3f(originFieldUniform.c_str(), p0.x, p0.y, p0.z);
+    shader.SetUniform3f(normalFieldUniform.c_str(), normal.x, normal.y, normal.z);
+    shader.SetUniform3f(v0FieldUniform.c_str(), v0.x, v0.y, v0.z);
+    shader.SetUniform3f(v1FieldUniform.c_str(), v1.x, v1.y, v1.z);
+    shader.SetUniform3f(v2FieldUniform.c_str(), v2.x, v2.y, v2.z);
+    shader.SetUniform3f(v3FieldUniform.c_str(), v3.x, v3.y, v3.z);
     i++;
   }
 
-  compositionShader.SetUniform1i("uNPlanes", i);
+  shader.SetUniform1i("uNPlanes", i);
 }
 
 // Particle system related methods

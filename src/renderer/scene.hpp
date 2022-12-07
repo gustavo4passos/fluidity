@@ -64,6 +64,15 @@ struct Scene
     void RemoveModel(int id)
     {
       models.erase(id);
+
+      for (auto i = planes.begin(); i != planes.end(); i++)
+      {
+        if (*i == id) 
+        {
+          planes.erase(i);
+          break;
+        }
+      }
     }
 
     void AddPlane(const vec3& translation = { 0.f, 0.f, 0.f }, 

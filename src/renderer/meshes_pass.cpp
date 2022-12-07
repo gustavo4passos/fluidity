@@ -9,13 +9,11 @@ namespace fluidity
 
 MeshesPass::MeshesPass(int bufferWidth,
     int bufferHeight,
-    const std::string& vsFilePath,
-    const std::string& fsFilePath,
+    const ShaderPaths& shaderPaths,
     const std::vector<FramebufferAttachment>& attachments,
     Scene* scene)
     : RenderPass(bufferWidth, bufferHeight, 0, 0),
-    m_vsFilePath(vsFilePath),
-    m_fsFilePath(fsFilePath),
+    m_shaderPaths(shaderPaths),
     m_hasSkybox(false),
     m_scene(scene)
 {
@@ -24,9 +22,9 @@ MeshesPass::MeshesPass(int bufferWidth,
 
 bool MeshesPass::Init()
 {
-    m_shader = new Shader(m_vsFilePath, m_fsFilePath);
-    m_skybBoxShader = new Shader("../../shaders/skybox.vert",
-    "../../shaders/skybox.frag");
+    m_shader = new Shader(m_shaderPaths);
+    m_skybBoxShader = new Shader({ "../../shaders/skybox.vert",
+    "../../shaders/skybox.frag" });
 
     return RenderPass::Init();
 }

@@ -29,7 +29,7 @@ ParticlePass::ParticlePass(
 
 bool ParticlePass::Init()
 {
-  m_shader = new Shader(m_vsFilePath, m_fsFilePath);
+  m_shader = new Shader({ m_vsFilePath, m_fsFilePath });
   if (!RenderPass::Init()) return false;
 
   return true;

@@ -12,8 +12,7 @@ class MeshesPass : public RenderPass
 public:
   MeshesPass(int bufferWidth,
     int bufferHeight,
-    const std::string& vsFilePath,
-    const std::string& fsFilePath,
+    const ShaderPaths& shaderPaths,
     const std::vector<FramebufferAttachment>& attachments,
     Scene* scene
     );
@@ -36,8 +35,7 @@ private:
   Shader* m_skybBoxShader;
   // TODO: This needs to be made const. Changes in the scene from here are not obvious
   Scene* m_scene;
-  std::string m_vsFilePath;
-  std::string m_fsFilePath;
+  ShaderPaths m_shaderPaths;
 
   bool m_hasSkybox;
   Skybox m_skybox;

@@ -2,6 +2,7 @@
 
 in  vec3 vPos;
 out vec4 fFragPos;
+out vec4 fFragEyePos;
 
 #define NUM_TOTAL_LIGHTS 8
 struct LightMatrix
@@ -20,6 +21,7 @@ uniform mat4 model;
 
 void main()
 {
-    fFragPos = lightMatrices[0].prjMatrix * lightMatrices[0].viewMatrix * model * vec4(vPos, 1.0);
+    fFragEyePos = lightMatrices[0].viewMatrix * model * vec4(vPos, 1.0);
+    fFragPos = lightMatrices[0].prjMatrix * fFragEyePos;
     gl_Position = fFragPos;
 }

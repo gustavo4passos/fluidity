@@ -26,7 +26,8 @@ namespace fluidity
     
     auto FluidSurfaceRenderers::Init() -> bool
     {
-        m_surfacesShader = new Shader("../../shaders/surface_rendering.vert", "../../shaders/surface_rendering.frag");
+        m_surfacesShader = new Shader({ "../../shaders/surface_rendering.vert", 
+         "../../shaders/surface_rendering.frag" });
 
         GLCall(glGenFramebuffers(1, &m_frameBuffer));
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, m_frameBuffer));

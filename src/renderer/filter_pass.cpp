@@ -22,7 +22,7 @@ FilterPass::FilterPass(
 
 bool FilterPass::Init()
 {
-  m_shader = new Shader("../../shaders/quad_rendering.vert", m_fsFilePath);
+  m_shader = new Shader({ "../../shaders/quad_rendering.vert", m_fsFilePath });
 
   if (m_useDoubleBuffer) m_framebuffer.DuplicateAttachment(0);
   if (!RenderPass::Init()) return false;
@@ -84,8 +84,12 @@ void FilterPass::Render()
   // Sanity check
   assert(m_shader != nullptr);
 
+  int viewportState[4];
+  glGetIntegerv(GL_VIEWPORT, viewportState);
+
   RenderState previousRenderState = GetCurrentOpenGLRenderState();
   ChangeOpenGLRenderState(m_renderState);
+  glViewport(0, 0, m_bufferWidth, m_bufferHeight);
 
   m_framebuffer.Bind();
   m_shader->Bind();
@@ -98,6 +102,7 @@ void FilterPass::Render()
   m_framebuffer.Unbind();
 
   // Restore previous render state
+  glViewport(viewportState[0], viewportState[1], viewportState[2], viewportState[3]);
   ChangeOpenGLRenderState(previousRenderState);
 }
 

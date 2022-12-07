@@ -57,9 +57,8 @@ namespace fluidity
         GLCall(glBindVertexArray(0));
         GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
-        m_textureShader = new Shader(
-            "../../shaders/texture_rendering.vert",
-            "../../shaders/texture_rendering.frag");
+        m_textureShader = new Shader({ "../../shaders/texture_rendering.vert",
+            "../../shaders/texture_rendering.frag" });
 
         return true;
     }

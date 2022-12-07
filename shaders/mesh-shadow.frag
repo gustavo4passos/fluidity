@@ -1,9 +1,13 @@
 #version 450
 
 in  vec4  fFragPos;
-out float fragColor;
+in  vec4  fFragEyePos;
+
+out float fragScreenPos;
+out float fragEyePos;
 
 void main()
 {
-    fragColor = (fFragPos.z / fFragPos.w) * 0.5 + 0.5;
+    fragScreenPos = (fFragPos.z / fFragPos.w) * 0.5 + 0.5;
+    fragEyePos = fFragEyePos.z;
 }

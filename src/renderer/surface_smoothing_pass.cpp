@@ -118,9 +118,8 @@ namespace fluidity
         GLCall(glDrawBuffers(1, attachments));
         GLCall(glBindFramebuffer(GL_FRAMEBUFFER, 0));
 
-        m_bilateralFilter = new Shader(
-            "../../shaders/texture_rendering.vert",
-            "../../shaders/narrow_range_filter.frag");
+        m_bilateralFilter = new Shader({ "../../shaders/texture_rendering.vert",
+            "../../shaders/narrow_range_filter.frag" });
         
         m_bilateralFilter->Bind();
         m_bilateralFilter->SetUniform1i("bufferWidth", m_bufferWidth);

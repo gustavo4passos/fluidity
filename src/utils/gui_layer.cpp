@@ -175,10 +175,10 @@ void GuiLayer::RenderParametersWindow()
             ImGui::SameLine();
             ImGui::Checkbox("PCF", &lightingParameters.usePcf);
             ImGui::Spacing();
-            ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias,   0.00001f, 0.f, 1.f);
-            ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias,   0.00001f, 0.f, 1.f);
+            ImGui::DragFloat("Min Shadow Bias",  &lightingParameters.minShadowBias,   0.00001f, 0.f, 1.f, "%.5f");
+            ImGui::DragFloat("Max Shadow Bias",  &lightingParameters.maxShadowBias,   0.00001f, 0.f, 1.f, "%.5f");
             ImGui::DragFloat("Object Shadow Intensity", &lightingParameters.shadowIntensity, 0.005f, 0.f, 1.f);
-            ImGui::DragFloat("Fluid Shadow Intensity", &lightingParameters.fluidShadowIntensity, 0.0005f, 0.f, 1.f);
+            ImGui::DragFloat("Fluid Shadow Intensity", &lightingParameters.fluidShadowIntensity, 0.0005f, 0.f, 1.f, "%.4f");
 
             ImGui::Spacing();
             ImGui::Spacing();
@@ -192,7 +192,9 @@ void GuiLayer::RenderParametersWindow()
 
             ImGui::DragFloat("Attenuatiuon", (float*)&fluidParameters.attenuation, 0.005f, 0.f, 1.f);
             ImGui::DragFloat("Reflection Constant", (float*)&fluidParameters.reflectionConstant, 0.005f, 0.f, 1.f);
-            ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0001, 0.0001, 1.f);
+            ImGui::DragFloat("Particle Radius", (float*)&fluidParameters.pointRadius, 0.0001, 0.001, 1.f, "%.4f");
+            if (fluidParameters.pointRadius < 0.0001) fluidParameters.pointRadius = 0.0001;
+
             ImGui::DragFloat("Refraction Modifier", (float*)&fluidParameters.refractionModifier, 0.0005, 0.0001, 5, "%.4f");
             ImGui::DragFloat("Refractive Index", (float*)&fluidParameters.refractiveIndex, 0.005f, -1.f, 1.f);
 
@@ -210,6 +212,10 @@ void GuiLayer::RenderParametersWindow()
             ImGui::SliderInt("Filter Size", &filteringParameters.filterSize, 1, 30);
             ImGui::SliderInt("Max Filter Size", &filteringParameters.maxFilterSize, 1, 200);
             ImGui::Checkbox("1D Filter", &filteringParameters.filter1D);
+
+            ImGui::Checkbox("Render Caustics", &fluidParameters.renderCaustics);
+            ImGui::SameLine();
+            ImGui::Checkbox("Back Surface Specular", &fluidParameters.backSurfaceSpecular);
 
             ImGui::Separator();
             // TODO: Gama correction is unusable for now
@@ -240,6 +246,7 @@ void GuiLayer::RenderParametersWindow()
             ImGui::Text("Models");
             // Used to avoid id conflicts on imgui
             int modelIdHash = 0;
+            std::vector<int> modelsToDelete;
             for (auto& modelPair : m_fluidRenderer->m_scene.models)
             {
                 auto& model = modelPair.second;
@@ -287,13 +294,21 @@ void GuiLayer::RenderParametersWindow()
                 ImGui::ColorEdit3("Specular", (float*)&material.specular);
                 ImGui::SliderFloat("Shininess", &material.shininess, 0.01, 3000);
                 ImGui::SliderFloat("Reflectiveness", &material.reflectiveness, 0.f, 2.f);
-
+                if (ImGui::Button("Remove"))
+                {
+                    modelsToDelete.push_back(modelPair.first);
+                }
                 ImGui::Spacing();
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::PopID();
             }
 
+            for (auto m : modelsToDelete)
+            {
+                m_fluidRenderer->m_scene.RemoveModel(m);
+            }
+            
             if (ImGui::Button("Load Model"))
             {
                 LoadModel();

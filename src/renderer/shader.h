@@ -7,16 +7,35 @@
 #include <GL/gl.h>
 
 struct ShaderSource {
-	std::string vertexShaderSource;
-	std::string fragmentShaderSource;
+	std::string vertexShaderSource   = std::string();
+	std::string fragmentShaderSource = std::string();
+	std::string geometryShaderSource = std::string();
+};
+
+struct ShaderPaths
+{
+	std::string vertexShaderPath;
+	std::string fragmentShaderPath;
+	std::string geometryShaderPath = std::string();
+
+	bool HasShader(GLenum shaderType)
+	{
+		switch(shaderType)
+		{
+			case (GL_VERTEX_SHADER): return !vertexShaderPath.empty();
+			case (GL_FRAGMENT_SHADER): return !fragmentShaderPath.empty();
+			case (GL_GEOMETRY_SHADER): return !geometryShaderPath.empty();
+			default: return false;
+		}
+	}
 };
 
 class Shader {
 public:
-	Shader(const std::string& vsFilepath, const std::string& fsFilepath);
+	Shader(const ShaderPaths& shaderPaths);
 	~Shader();
 
-	unsigned int programID() const { return (unsigned int)_programID; }
+	unsigned int programID() const { return (unsigned int)m_programID; }
 
 	void Bind();
 	void Unbind();
@@ -37,16 +56,15 @@ public:
 	void PrintActiveAttributes() const;
 	void PrintActiveUniforms() const;
 
-	int ID() { return _programID; }
+	int ID() { return m_programID; }
 
 private:
-	GLuint _programID;
-	ShaderSource _shaderSource;
+	GLuint m_programID;
+	ShaderSource m_shaderSource;
 
-	std::string _vertexShaderFilepath;
-	std::string _fragmentShaderFilepath;
+	ShaderPaths m_shaderPaths;
 
-	ShaderSource ParseShader(const std::string& vsFilepath, const std::string& fsFilepath);
+	ShaderSource ParseShader(const ShaderPaths& shaderPaths);
 	GLuint CreateShader(const ShaderSource& shaderSource);
 	GLuint CompileShader(GLenum shaderType, const std::string& source);
 	GLint GetUniformLocation(const std::string& name, bool silentFail);

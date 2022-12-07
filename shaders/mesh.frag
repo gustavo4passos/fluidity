@@ -38,6 +38,7 @@ uniform sampler2D uShadowMap;
 uniform samplerCube uSkybox;
 uniform sampler2D uFluidShadowMap;
 uniform sampler2D uFluidShadowThicknessMap;
+uniform sampler2D uCausticsMap;
 
 uniform int uRenderShadows;
 uniform int uRenderFluidShadows;
@@ -53,6 +54,8 @@ uniform vec3  uSpecular;
 uniform float uShininess;
 uniform int   uEmissive;
 uniform float uReflectiveness;
+
+uniform int uRenderCaustics;
 
 float calculateAttenuation(vec3 fragPos, vec3 lightPos)
 {
@@ -173,6 +176,17 @@ float getLightSpaceDepth(vec4 fragPosLightSpace, vec3 fragNormal, vec3 lightDir)
 
 void main()
 {
+    float lightMultiplier = 1;
+    vec4 causticsPolygon = texture(uCausticsMap, gl_FragCoord.xy / vec2(1366.0, 768.0));
+    if (false && uRenderCaustics == 1)
+    {
+        // If it has been affected by caustics
+        if (causticsPolygon.a != 0) lightMultiplier = causticsPolygon.x;
+        if (lightMultiplier < 0.1) lightMultiplier = 1;
+        if (lightMultiplier < uFluidShadowIntensity) lightMultiplier = uFluidShadowIntensity;
+        lightMultiplier = causticsPolygon.x;
+    }
+
     // vec3 color = vec3(233.0 / 255.0, 116.0 / 255.0, 81.0 / 255.0);
     // fragColor = vec3(149.0 / 255.0, 69.0 / 255.0, 53.0 / 255.0); // Chestnut color
     vec3 normal   = normalize(fNormal);
@@ -183,7 +197,7 @@ void main()
 
     float specularStrength = 1;
     vec3 specReflectDir = reflect(lightDir, normal);
-    vec3 specular = pow(max(dot(viewDir, specReflectDir), 0), uShininess) * uSpecular * lights[0].diffuse.xyz;
+    vec3 specular = pow(max(dot(viewDir, specReflectDir), 0), uShininess) * uSpecular * lights[0].diffuse.xyz * lightMultiplier;
 
     float solidShadow = 1;
     vec3 fluidShadow = vec3(1);
@@ -227,7 +241,7 @@ void main()
     vec3 reflectionDir = reflect(-viewDir, normal);
     vec4 reflectionColor = texture(uSkybox, reflectionDir);
 
-    vec3 diffuse = max(dot(normal, -lightDir), 0.0) * lights[0].diffuse.xyz * uDiffuse;
+    vec3 diffuse = max(dot(normal, -lightDir), 0.0) * lights[0].diffuse.xyz * lightMultiplier * uDiffuse;
     vec3 ambient = uDiffuse * lights[0].ambient.xyz;
     vec3 nonReflectiveColor = (diffuse + specular);
 
@@ -243,6 +257,7 @@ void main()
     // Otherwise, use the normal lighting calculations
     // TODO: If material is emissive, the whole lighting calculation can be ignored.
     fragColor = (-1 * uEmissive + 1) * fragColor + uEmissive * uDiffuse;
+
     vec4 clipSpacePos = projectionMatrix * vec4(fFragEyePos, 1.0);
     fragDepth = vec4(fFragEyePos, 1.0).z;
     gl_FragDepth = clipSpacePos.z / clipSpacePos.w;

@@ -101,10 +101,13 @@ uniform float uRefractionModifier;
 uniform int   uUseRefractionMask;
 uniform int   uTwoSidedRefractions; 
 uniform float uRefractiveIndex;
+uniform float u_ParticleRadius;
+uniform int   uBackSurfaceSpecular;
 
 // in/out
 in vec2  f_TexCoord;
 out vec4 fragColor;
+out float failedToFind;
 
 //-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 // const variables
@@ -184,7 +187,7 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
 {
   float t0 = 0;
   vec3 frontNormal = texture(u_FrontNormalTex, texCoord).xyz;
-  vec3 Tf = normalize(refract(-viewDir, frontNormal, 1.0 / refractiveIndex));
+  vec3 Tf = normalize(refract(-viewDir, frontNormal, uRefractiveIndex));
   vec3 Pf = uvToEye(f_TexCoord, depth);
 
   float ts = t0;
@@ -195,7 +198,7 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
     te *= 0.5;
   }
 
-  const float epsilon = 0.01;
+  const float epsilon = 0.1;
   float intersection = 0;
 
   int i = 0;
@@ -209,6 +212,7 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
 
     if (abs(deltaZ(Pf, Tf, tStar)) < epsilon)
     {
+      failedToFind = 0;
       intersection = tStar;
       break;
     }
@@ -221,6 +225,7 @@ vec3 findRefractionIntersection(vec2 texCoord, float depth, vec3 viewDir)
     // Give up after 10 iterations
     if (i == 10)
     {
+        failedToFind = 1;
         intersection = tStar;
         break;
     }
@@ -280,6 +285,11 @@ IntersectionData FindRayPlaneIntersection(PlaneData plane, vec3 rayOrigin, vec3 
 
   float tx = ProjectVectorOntoLineT(v1o, into);
   float ty = ProjectVectorOntoLineT(v3o, into);
+
+  // Because of the particle radius being customizable, the ray might need to go "backwards".
+  // This will only be acceptable if the distance the ray has to travel is less than 
+  // particle radius * 2
+  if (result.t < 0 && result.t < -u_ParticleRadius * 2) return result;
 
   // If the projection of the intersection vector falls outside on any of the projection, 
   // the point is not inside the plane section
@@ -419,13 +429,15 @@ void main()
       vec3 normalAtIntersectionWorld = normalize(mat3(transpose(viewMatrix)) * normalAtIntersection);
       vec3 refractionDirWorld = normalize(refract(TfWorld, normalAtIntersectionWorld, uRefractiveIndex));
       refractionColor         = texture(u_SkyBoxTex, refractionDirWorld).xyz * colorAttennuation;
-    
-#if ENABLE_BACK_SURFACE_SPECULAR
+
+      if (uBackSurfaceSpecular == 1)
+      {
         // Specular at the back surface
         vec3  viewerBack = normalize(-intersection);
         vec3  H        = normalize(lightDir + viewerBack);
         specular += pow(max(0.0f, dot(H, normalAtIntersection)), material.shininess);
-#endif
+      }
+
       float closestIntersectionT = -farZ;
       for(int i = 0; i < uNPlanes; i++)
       {

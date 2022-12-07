@@ -62,12 +62,12 @@ struct PointLight {
   Vec4 specular;
   Vec4 position;
 
-  static float GetLightZFar()
+  static float GetZFar()
   {
     return 100.f;
   }
 
-  static float GetLightZNear()
+  static float GetZNear()
   {
     return 1.f;
   }
@@ -75,7 +75,8 @@ struct PointLight {
   glm::mat4 GetProjectionMatrix()
   {
     const float radius = 10.f;
-    return glm::ortho(-radius, radius, -radius, radius, GetLightZNear(), GetLightZFar());
+    // return glm::perspective(glm::radians(45.f), 1366.f/768.f, GetZNear(), GetZFar());
+    return glm::ortho(-radius, radius, -radius, radius, GetZNear(), GetZFar());
   }
 
   glm::mat4 GetViewMatrix()
